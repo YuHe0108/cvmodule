@@ -73,6 +73,6 @@ if __name__ == '__main__':
     out_1 = conv_bn_activate(out_0, filters=256, k_size=3, strides=2)
     out_2 = conv_bn_activate(out_1, filters=512, k_size=3, strides=2)
     out_ = asff_layer(inputs=[out_2, out_1, out_0], level=1)
-    print(out_.shape)
     model_ = keras.Model(inputs_, out_)
     model_.summary()
+    print(out_.shape)
