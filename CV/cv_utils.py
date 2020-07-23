@@ -6,6 +6,15 @@ import matplotlib.pyplot as plt
 from tf_package import utils
 
 
+def binary_image(image, threshold):
+    """使用固定的阈值 threshold 二值化图像"""
+    if str(image) is str:
+        image = cv.imread(image)
+    image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+    th, bin_img = cv.threshold(image, threshold, 255, cv.THRESH_BINARY)
+    return bin_img
+
+
 def pic_to_video(img_dir, size):
     """将多张图像合成为一个视频"""
     img_paths = [os.path.join(img_dir, path) for path in os.listdir(img_dir)]
@@ -74,7 +83,7 @@ def rename_file(img_dir, save_dir):
     return
 
 
-def draw_contures_by_mask(image_dir,
+def draw_contours_by_mask(image_dir,
                           mask_dir,
                           save_dir,
                           mask_prefix=False,
