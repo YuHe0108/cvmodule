@@ -6,9 +6,22 @@ import matplotlib.pyplot as plt
 from tf_package import utils
 
 
+def inverse_image(image):
+    if type(image) is str:
+        image = cv.imread(image)
+    height, width, channels = image.shape
+
+    for row in range(height):
+        for col in range(width):
+            for c in range(channels):
+                pv = image[row, col, c]
+                image[row, col, c] = 255 - pv
+    return image
+
+
 def binary_image(image, threshold):
     """使用固定的阈值 threshold 二值化图像"""
-    if str(image) is str:
+    if type(image) is str:
         image = cv.imread(image)
     image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
     th, bin_img = cv.threshold(image, threshold, 255, cv.THRESH_BINARY)
