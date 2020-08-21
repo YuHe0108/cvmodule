@@ -227,6 +227,34 @@ def save_samples(gen_sample, save_path, epoch, step=0, i=0, color='rgb', denorm=
     return
 
 
+def rename_files(root_dir, save_root_dir):
+    """重命名文件夹下各个图像的名称为数字"""
+    files = list_file(root_dir)
+    for file in files:
+        file_name = pathlib.Path(file).name
+        save_dir = os.path.join(save_root_dir, file_name)
+        check_file(save_dir)
+        imgs_path = list_file(file)
+        for index, img_path in enumerate(imgs_path):
+            shutil.copy(img_path, os.path.join(save_dir, '{}.jpg'.format(index)))
+    return
+
+
+def reshape_imgs(root_dir, save_root_dir, reshape_size=(800, 800)):
+    """reshape各个文件夹下图像的尺寸"""
+    files = list_file(root_dir)
+    for file in files:
+        file_name = pathlib.Path(file).name
+        save_dir = os.path.join(save_root_dir, file_name)
+        check_file(save_dir)
+        imgs_path = list_file(file)
+        for index, img_path in enumerate(imgs_path):
+            img = cv.imread(img_path)
+            img = cv.resize(img, reshape_size)
+            cv.imwrite(os.path.join(save_dir, '{}.jpg'.format(index)), img)
+    return
+
+
 if __name__ == '__main__':
     # import test_data
     #
