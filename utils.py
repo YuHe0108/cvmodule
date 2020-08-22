@@ -255,6 +255,7 @@ def reshape_imgs(root_dir, save_root_dir, reshape_size=(800, 800)):
     return
 
 
+
 if __name__ == '__main__':
     # import test_data
     #
@@ -278,3 +279,4 @@ if __name__ == '__main__':
     # norm_file_name(r'J:\DATA\ObjDet\COCO\COCO_2017train_zip')
     reverse_file_name(r'J:\DATA\ObjDet\COCO\COCO_2017train_zip')
     pass
+    
