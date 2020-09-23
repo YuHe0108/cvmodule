@@ -1,11 +1,51 @@
-import matplotlib.pyplot as plt
-import numpy as np
-import cv2 as cv
-import pathlib
-import shutil
-import tqdm
 import math
 import os
+import pathlib
+import shutil
+
+import cv2 as cv
+import matplotlib.pyplot as plt
+import numpy as np
+import tqdm
+
+
+def move_all_files(root_dir, save_dir):
+    """
+    将一个文件夹下的所有图像全部都复制到另一个文件夹下。
+    """
+    files = list_all_file(root_dir)
+    for i, file in tqdm.tqdm(enumerate(files)):
+        shutil.copyfile(os.path.join(root_dir, file),
+                        os.path.join(save_dir, f'{i}.jpg'))
+    return
+
+
+def copy_dir_by_name(root_dir, save_dir, dir_names):
+    """
+    root_dir: 原始文件夹目录
+    save_dir: 带保存的目录
+    dir_names: 从root_dir下复制哪些文件夹
+    dir_names = "7 11 45 43 22 42 6 4 48 41 21"
+    """
+    dir_names = dir_names.split(' ')
+    for dir_stem in tqdm.tqdm(dir_names):
+        shutil.copytree(os.path.join(root_dir, dir_stem), os.path.join(save_dir, dir_stem))
+    return
+
+
+def copy_file_by_name(name_root_path, source_path, save_path):
+    """从一个文件夹下通过文件名复制文件
+        name_root_path: 根据此文件夹下文件的名称复制
+        source_path: 从哪个文件夹下复制
+        save_path: 将复制的文件保存在哪里
+    """
+    path, stem = get_path_and_name(name_root_path)
+    for s in tqdm.tqdm(stem):
+        save_path = os.path.join(save_path, s)
+        if not os.path.exists(save_path):
+            s_path = os.path.join(source_path, s)
+            shutil.copyfile(s_path, save_path)
+    return
 
 
 def norm_file_name(file_dir):
@@ -106,13 +146,23 @@ def is_same_two_path_list(path_dir_1, path_dir_2):
 
 
 def get_path_and_stem(path_dir):
-    """返回path_dir下所有的文件路径以及name"""
+    """返回path_dir下所有的文件路径以及name, 没有文件后缀"""
     paths = []
     stems = []
     for path in pathlib.Path(path_dir).iterdir():
         paths.append(str(path))
         stems.append(path.stem)
     return sorted(paths), sorted(stems)
+
+
+def get_path_and_name(path_dir):
+    """返回path_dir下所有的文件路径以及name, 带有后缀"""
+    paths = []
+    names = []
+    for path in pathlib.Path(path_dir).iterdir():
+        paths.append(str(path))
+        names.append(path.name)
+    return sorted(paths), sorted(names)
 
 
 def list_all_file(dir_path):
@@ -255,7 +305,6 @@ def reshape_imgs(root_dir, save_root_dir, reshape_size=(800, 800)):
     return
 
 
-
 if __name__ == '__main__':
     # import test_data
     #
@@ -279,4 +328,3 @@ if __name__ == '__main__':
     # norm_file_name(r'J:\DATA\ObjDet\COCO\COCO_2017train_zip')
     reverse_file_name(r'J:\DATA\ObjDet\COCO\COCO_2017train_zip')
     pass
-    
