@@ -2,7 +2,7 @@
 包含了常见的基于深度学习的图像分割模型: FCN、UNet、DeepLab-v3、SegNet、PSPNet等,
 所有模型的输出没有经过激活函数。
 """
-from . import deeplab, fcn, hr_net, psp_net, refine_net, seg_net, unet, unet_bn
+from . import deeplab, fcn, hr_net, psp_net, refine_net, seg_net, unet, unet_bn, deeplabv3_plus
 
 
 def get_seg_model(model_name, input_shape, num_classes, dims=32, **kwargs):
@@ -20,7 +20,7 @@ def get_seg_model(model_name, input_shape, num_classes, dims=32, **kwargs):
     elif model_name == 'segnet':
         seg_model = seg_net.segnet_model(input_shape, dims, num_classes)
     elif model_name == 'deeplabv3+':
-        seg_model = deeplab.deeplab_v3(input_shape, num_classes, **kwargs)
+        seg_model = deeplabv3_plus.deeplab_v3_plus(input_shape, num_classes, **kwargs)
     elif model_name == 'pspnet':
         seg_model = psp_net.pspnet(input_shape, num_classes, dims=dims ** kwargs)
     elif model_name == 'refinenet':
