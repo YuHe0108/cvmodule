@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
-from tf_package.Module import get_norm
+from cvmodule.Module import get_norm
 from collections import OrderedDict
 
 VoVNet19_slim_dw_eSE = {

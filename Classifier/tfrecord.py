@@ -25,7 +25,7 @@ def get_path_and_name(data_dir, sample_nums=60000):
     all_paths = []
     all_names = []
     for path in pathlib.Path(data_dir).iterdir():
-        all_paths.appnd(str(path))
+        all_paths.append(str(path))
         all_names.append(path.name)
     return all_paths[:sample_nums], all_names[:sample_nums]
 
@@ -189,7 +189,7 @@ class TFRecord:
 if __name__ == '__main__':
     data_dir_ = r''  # 图像存放位置，主文件夹下只能有一个文件夹，并且不能有中文路径
     data_label = 0  # 目标标签
-    tf_cord = TF_Record(image_shape=(256, 256, 3), zip_file=True)
+    tf_cord = TFRecord(image_shape=(256, 256, 3), zip_file=True)
     all_paths, all_labels = tf_cord.get_path_and_label(data_dir=data_dir_,
                                                        label=data_label)
     train_paths, test_paths, train_labels, test_labels = train_test_split(all_paths, all_labels, test_size=0.1)

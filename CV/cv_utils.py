@@ -3,7 +3,7 @@ import time
 import pathlib
 import cv2 as cv
 import matplotlib.pyplot as plt
-from tf_package import utils
+from cvmodule import utils
 
 
 def inverse_image(image):

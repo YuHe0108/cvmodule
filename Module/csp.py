@@ -14,13 +14,13 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 
-from tf_package.ConvModel import conv_utils
+from cvmodule.ConvModel import conv_utils
 
 
-def csp_layer(inputs, filters, compression, groups=2, dense_layer=4):
+def csp_layer(inputs, filters, compression, k_size, groups=2, dense_layer=4):
     """卷积部分采用 Dense-Block 实现"""
     split_outs = tf.split(inputs, num_or_size_splits=groups, axis=-1)
-    out = conv_bn_activation(split_outs[1], filters, k_size, padding='same',
-                             strides=1, activation='leaky relu', bn=True)
+    out = conv_utils.conv_bn_activation(split_outs[1], filters, k_size, padding='same',
+                                        strides=1, activation='leaky relu', bn=True)
     out = layers.Concatenate()([split_outs[0], out])
     return out

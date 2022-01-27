@@ -6,7 +6,7 @@ SE-Net: 通道上的注意力
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
-from tf_package.Module import se_block
+from cvmodule.Module import se_block
 
 
 def squeeze_module():

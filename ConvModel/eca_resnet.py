@@ -2,7 +2,7 @@ from tensorflow.keras import layers
 from tensorflow import keras
 import tensorflow as tf
 
-from tf_package.Module import eca
+from cvmodule.Module import eca
 
 
 def eca_resnet(inputs, num_classes, layers_per_block, block_type='basic_block', k_size=None):

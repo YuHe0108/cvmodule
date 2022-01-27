@@ -6,8 +6,8 @@ import cv2 as cv
 import pathlib
 import os
 
-from tf_record import TF_Record
-from tf_package import utils
+from tfrecord import TFRecord
+from cvmodule import utils
 
 # 数据的名称、尺寸、类别数量
 classes = 0
@@ -53,7 +53,7 @@ def cifar_data(batch_size, re_size):
 
 
 def get_tfrecord_data(tf_record_path, batch_size, repeat, re_size, ori_size, augment=False):
-    tfrecord = TF_Record(image_shape=ori_size, zip_file=True)
+    tfrecord = TFRecord(image_shape=ori_size, zip_file=True)
     if os.path.isdir(tf_record_path):
         data_set = tfrecord.from_dir_get_data(batch_size, tf_record_path, repeat, augment=augment)
     else:
