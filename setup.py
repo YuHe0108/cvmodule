@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="cv_module",
-    version="0.0.4",
+    version="0.0.5",
     author="YuHe",
     author_email="1941254847@qq.com",
     description="modules related to deep learning in computer vision",
