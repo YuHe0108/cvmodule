@@ -3,4 +3,5 @@
 1. ECA
 2. VOV
 3. ConvNext: https://arxiv.org/pdf/2201.03545.pdf CNN可以通过结构的调整优于Transformer
+
 """
