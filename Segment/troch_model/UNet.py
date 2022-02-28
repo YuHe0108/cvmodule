@@ -81,7 +81,7 @@ class UNet(nn.Module):
 
         self.Conv = nn.Conv2d(filters[0], out_ch, kernel_size=1, stride=1, padding=0)
 
-    # self.active = torch.nn.Sigmoid()
+        # self.active = torch.nn.Sigmoid()
 
     def forward(self, x):
         e1 = self.Conv1(x)
