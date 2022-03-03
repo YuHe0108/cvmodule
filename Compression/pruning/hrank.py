@@ -1,3 +1,4 @@
+import os
 import pickle
 import torch
 import numpy as np
@@ -68,10 +69,23 @@ class GeneratorMask:
 
     def grad_mask(self, cov_id):
         params = self.model.parameters()
+        remain_weights_file = self.job_dir + '\\remain_weights'  # 保存裁剪后的权重
+        if not os.path.exists(remain_weights_file):
+            remain_weights = {}
+        else:
+            with open(remain_weights_file, 'rb') as f:
+                remain_weights = pickle.load(f)
+
         for index, item in enumerate(params):
             if index == cov_id * self.param_per_cov:
                 break
-            # 根据mask，裁剪掉对应的参数
-            item.data = item.data * self.mask[index].to(self.device)  # prune certain weight
+            cur_mask = self.mask[index]
+            # 与权重mask相乘,减掉的权重置0,维度保持不变
+            item.data = item.data * cur_mask.to(self.device)
+            # 根据mask，裁剪掉对应的权重, 维度发生了改变
+            select_idx = torch.tensor([i for i in range(len(cur_mask)) if cur_mask[i] == 1], dtype=torch.int)
+            res = torch.index_select(item.data, 0, select_idx)
+            remain_weights[index] = res
 
-
+        with open(remain_weights_file, "wb") as f:  # 将裁剪后的重要的权重，保存在本地
+            pickle.dump(remain_weights, f)

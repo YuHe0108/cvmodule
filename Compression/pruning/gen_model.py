@@ -494,9 +494,9 @@ class M(nn.Module):
         super(M, self).__init__()
         self.module_list = nn.ModuleList()
         self.module_list.add_module("conv_1", nn.Conv2d(3, 10, 3, 1))
+        self.module_list.add_module("bn_1", nn.BatchNorm2d(10))
         self.module_list.add_module("conv_2", nn.Conv2d(3, 10, 3, 1))
         self.module_list.add_module("relu", nn.ReLU())
-        print(list(self.modules()))
 
     def forward(self, x):
         for layer in self.module_list:
@@ -505,4 +505,5 @@ class M(nn.Module):
 
 
 if __name__ == '__main__':
-    pass
+    m = M()
+    print(m)
