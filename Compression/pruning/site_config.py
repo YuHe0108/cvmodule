@@ -87,8 +87,4 @@ def generator_config(module_defs, cfg_file, mask=None):
 
 
 if __name__ == '__main__':
-    import pickle
-
-    with open(r'D:\LasoFiles\Github\DL\HRank-master\result\tmp\mask', 'rb') as file:
-        data = pickle.load(file)
-        print(data[2].size())
+    pass

@@ -12,7 +12,7 @@ def create_modules(module_defs):
     Constructs module list of layer blocks from module configuration in module_defs
     """
     hyperparams = module_defs.pop(0)
-    output_filters = [int(hyperparams["channels"])]
+    output_filters = [int(hyperparams["channels"])]  # 输入图像的通道数
     module_list = nn.ModuleList()  # 一定要用ModuleList()才能被torch识别为module并进行管理，不能用list！
     for module_i, module_def in enumerate(module_defs):
         modules = nn.Sequential()
@@ -88,6 +88,15 @@ class EmptyLayer(nn.Module):  # 只是为了占位，以便处理route层和shor
         super(EmptyLayer, self).__init__()
 
 
+class Add(nn.Module):
+    def __init__(self, layer_feature):
+        super(Add, self).__init__()
+        self.layer_feature = layer_feature
+
+    def forward(self, x):
+        return x + self.layer_feature
+
+
 class GenModel(nn.Module):
     def __init__(self, config_path, img_size=416):
         super().__init__()
@@ -120,7 +129,7 @@ class GenModel(nn.Module):
                 x = torch.cat([layer_outputs[int(layer_i)] for layer_i in module_def["layers"].split(",")], 1)
             elif module_def["type"] == "shortcut":  # shortcut: res-block结构
                 layer_i = int(module_def["from"])
-                x = layer_outputs[-1] + layer_outputs[layer_i]
+                x = layer_outputs[layer_i] + layer_outputs[-1]
                 if module_def["activation"] == "leaky":
                     x = F.leaky_relu(x, negative_slope=0.1, inplace=True)
                 elif module_def["activation"] == "relu":
@@ -506,4 +515,7 @@ class M(nn.Module):
 
 if __name__ == '__main__':
     m = M()
-    print(m)
+    # torch.save(m.state_dict(), 'm.pt')
+    array = torch.load('m.pt')
+    for k, v in array.items():
+        print(k)
