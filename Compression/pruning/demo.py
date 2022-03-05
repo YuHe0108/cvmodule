@@ -67,14 +67,14 @@ def test():
             mean_accu = test_accu / (step + 1)
 
     print('accu: {:.2f}'.format(mean_accu), time.time() - t)
-    if mean_accu > best_accu:
-        best_accu = mean_accu
-        torch.save({'state_dict': model.state_dict()}, 'cifar10.pt')
+    # if mean_accu > best_accu:
+    #     best_accu = mean_accu
+    #     torch.save({'state_dict': model.state_dict()}, 'cifar10.pt')
     return
 
 
 def train(pruning=False):
-    for epoch in range(5):
+    for epoch in range(15):
         model.train()
         train_data = data.loader_train
 
@@ -87,6 +87,8 @@ def train(pruning=False):
 
             if pruning:  # 施加裁剪, 每一个step，都要施加裁剪，保证了每次计算都是裁剪后的模型
                 mask_model.grad_mask(cov_id)
+                if step > 50:
+                    break
 
             loss = loss_fun(output, target)
             optimizer.zero_grad()
@@ -121,27 +123,30 @@ if __name__ == '__main__':
     args_ = Args()
     data = Data(args_)
 
+    best_accu = 0
     cfg = parse_model_config('model.cfg')
     model = gen_model.GenModel(cfg)
+    # model = gen_model.GenModel('pruned_arc.cfg')
     loss_fun = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters())
-
-    best_accu = 0
-    # model.load_model_weights('mnist.pt')
-    # test()
-    train()
-    """
-    model.load_model_weights('mnist.pt')
+    model.load_model_weights('cifar10.pt')
     test()
+    # model.load_model_weights('cifar10.pt')
+    # train()
 
+    # model.load_model_weights('cifar10.pt')
+    # test()
+    # train()
+    """
+    model.load_model_weights('cifar10.pt')
+    test()
     # 根据卷积层生成秩
     feature_result = torch.tensor(0.)
     total = torch.tensor(0.)
-    rank_save_dir = os.path.join('rank_conv', 'mnist')
+    rank_save_dir = os.path.join('rank_conv', 'cifar10')
     if not os.path.exists(rank_save_dir):
         os.makedirs(rank_save_dir)
 
-    print(model.module_list)
     cnt = 0
     for i, (module_def, module) in enumerate(zip(model.module_defs, model.module_list)):
         if module_def['type'] == 'convolutional':
@@ -155,21 +160,21 @@ if __name__ == '__main__':
                     feature_result = torch.tensor(0.)
                     total = torch.tensor(0.)
     """
-    # test()
-    # weight = torch.load('mnist.pt')
-    # for layer in model:
-    #     print(layer)
-    # print(weight['state_dict'])
-    # train()
     """生成mask
-    compress_rate = [0.8, 0.95, 0.8]  # 减掉 30 %
-    mask_model = hrank.GeneratorMask(model, compress_rate, job_dir='mnist_mask')
-    for cov_id in range(2):
+    model.load_model_weights('cifar10.pt')
+    compress_rate = [0.5, 0.8, 0.8, 0.8, 0.5, 0.5]  # 减掉 30 %
+    shortcut_idx = [-1, -1, 0, -1, -1, 3, -1]  # 如果是残差连接, mask要和前一层的相加的mask一致
+    mask_model = hrank.GeneratorMask(model, compress_rate, job_dir='cifar10_mask')
+    for cov_id in range(len(compress_rate)):
         print("cov-id: %d ====> Resuming from pruned_checkpoint..." % cov_id)
-        mask_model.layer_mask(cov_id + 1, resume='', param_per_cov=3, arch='mnist')  # 计算需要裁剪哪些
+        mask_model.layer_mask(cov_id + 1, resume='', param_per_cov=3,
+                              arch='cifar10', shortcut_idx=shortcut_idx[cov_id])  # 计算需要裁剪哪些
         optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
         best_acc = 0.
-        train()  # 施加裁剪
-        test()
-    torch.save({'state_dict': model.state_dict()}, 'mnist_pruned.pt')
+        train(pruning=True)  # 施加裁剪
+    torch.save({'state_dict': model.state_dict()}, 'cifar10_pruned.pt')  # 需要保存裁剪后的权重
     """
+    """ 测试裁剪后的权重：测试集准确率 """
+    model = gen_model.GenModel('pruned_arc.cfg')
+    model.load_model_weights('pruned_ckpt.pt')
+    test()

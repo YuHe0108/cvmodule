@@ -35,15 +35,16 @@ class GeneratorMask:
         self.job_dir = job_dir  # 存放 mask 的 dir 路径
         self.device = device
         self.param_per_cov = None
+        self.prune_one_size = False  # 是否裁剪卷积核为 1x1 的filter
 
-    def layer_mask(self, cov_id, resume=None, param_per_cov=3, arch="resnet_56"):
+    def layer_mask(self, cov_id, shortcut_idx, resume=None, param_per_cov=3, arch="resnet_56"):
         """
         conv_id:            减掉第几个卷积层的参数
         resume:             第一次更新mask的时候，为None, 后续会在前次的基础上增加
         param_per_cov:      每一层有多少参数
+        shortcut_idx:      当前的卷积层和哪层卷积输出相加
         """
         params = self.model.parameters()
-        # prefix = "rank_conv\\" + arch + "\\rank_conv"
         prefix = os.path.join('rank_conv', arch, 'rank_conv')  # 根据rank_conv和compress_rate删减filter
         subfix = ".npy"
 
@@ -53,25 +54,30 @@ class GeneratorMask:
         else:
             resume = self.job_dir + '\\mask'
 
-        self.param_per_cov = param_per_cov  # 有多少个卷积层
-        prune_one_size = False  # 是否裁剪卷积核为1x1的filter
+        self.param_per_cov = param_per_cov  # 有多少参数需要共用一个mask
         for index, item in enumerate(params):  # 逐层遍历模型的参数
-            if index == cov_id * param_per_cov:
+            if index == cov_id * param_per_cov:  # 逐层计算mask, 当前属于下一层卷积，需要跳出
                 break
+
             if index == (cov_id - 1) * param_per_cov:  # 当前层是卷积层
                 f, c, w, h = item.size()
-                rank = np.load(prefix + str(cov_id) + subfix)
-                pruned_num = int(self.compress_rate[cov_id - 1] * f)
-                ind = np.argsort(rank)[pruned_num:]  # preserved filter id
-
-                zeros = torch.zeros(f, 1, 1, 1).to(self.device)
-                for i in range(len(ind)):
-                    zeros[ind[i], 0, 0, 0] = 1.
-                self.mask[index] = zeros  # convolutional weight
+                if self.prune_one_size and w == h == 1:  # 卷积核的尺寸为 1x1
+                    pass
+                if shortcut_idx == -1:
+                    rank = np.load(prefix + str(cov_id) + subfix)
+                    pruned_num = int(self.compress_rate[cov_id - 1] * f)
+                    ind = np.argsort(rank)[pruned_num:]  # preserved filter id
+                    mask = torch.zeros(f, 1, 1, 1).to(self.device)
+                    for i in range(len(ind)):
+                        mask[ind[i], 0, 0, 0] = 1.
+                else:
+                    # 残差结构需要保证mask一致
+                    mask = self.mask[shortcut_idx * param_per_cov]
+                self.mask[index] = mask  # convolutional weight
                 item.data = item.data * self.mask[index]
             elif (cov_id - 1) * param_per_cov < index < cov_id * param_per_cov:
                 # 当前层的权重为 BN 的 bias 和 weight，选择和前一层Conv相同的裁剪mask
-                self.mask[index] = torch.squeeze(zeros)
+                self.mask[index] = torch.squeeze(mask)
                 item.data = item.data * self.mask[index].to(self.device)
 
         with open(resume, "wb") as f:  # 保存 mask 至本地
@@ -117,7 +123,7 @@ def generator_pruned_model(pruned_ckpt, config_file, mask_dir):
         v = torch.index_select(v.data, 0, select_idx)
         new_weight[k] = v
 
-    torch.save({'state_dict': new_weight}, 'pruned_ckpt.pt')  # 重新保存模型的参数
+    torch.save({'state_dict': new_weight}, 'pruned_ckpt.pt')  # 保存已经剪枝后模型的参数
     filter_idx = 0  # 根据索引判定每层卷积层，剪枝后的filter数量，重新生成配置文件
     with open('pruned_arc.cfg', 'w') as f:
         for module_def in module_defs:
@@ -137,5 +143,5 @@ def generator_pruned_model(pruned_ckpt, config_file, mask_dir):
 
 
 if __name__ == '__main__':
-    generator_pruned_model('mnist.pt', 'model.cfg',
-                           r'D:\LasoFiles\test_git\cvmodule\Compression\pruning\mnist_mask\mask')
+    generator_pruned_model('cifar10_pruned.pt', 'model.cfg',
+                           r'D:\LasoFiles\test_git\cvmodule\Compression\pruning\cifar10_mask\mask')

@@ -159,6 +159,8 @@ class GenModel(nn.Module):
                     x = F.leaky_relu(x, negative_slope=0.1, inplace=True)
                 elif module_def["activation"] == "relu":
                     x = F.relu(x, inplace=True)
+                elif module_def["activation"] == "linear":
+                    x = x
             else:
                 raise NotImplementedError
             layer_outputs.append(x)  # 将每个块的output都保存起来
@@ -468,7 +470,7 @@ class M(nn.Module):
 if __name__ == '__main__':
     cfg = parse_model_config('model.cfg')
     model = GenModel(cfg)
-    inputs = torch.normal(1, 1, size=(2, 1, 28, 28))
+    inputs = torch.normal(1, 1, size=(2, 3, 32, 32))
     print(model(inputs))
-    torchsummary.summary(model, (1, 28, 28))
+    torchsummary.summary(model, (3, 32, 32))
     print(model)
