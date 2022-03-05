@@ -3,6 +3,7 @@ import pickle
 import torch
 import numpy as np
 import torchsummary
+import copy
 
 # 自定义文件
 from site_config import parse_model_config
@@ -18,7 +19,7 @@ import gen_model
 class GeneratorMask:
     """逐层生成 filter 的mask， mask[idx] == 0 的位置，所以该特征图不重要"""
 
-    def __init__(self, model=None, compress_rate=None, job_dir='', device=None):
+    def __init__(self, model=None, compress_rate=None, job_dir='', device='cpu'):
         """
         model:          需要裁剪的模型
         compress_rate:  模型每层的压缩率
@@ -37,11 +38,13 @@ class GeneratorMask:
 
     def layer_mask(self, cov_id, resume=None, param_per_cov=3, arch="resnet_56"):
         """
-        conv_id:    减掉第几个卷积层的参数
-        resume:     第一次更新mask的时候，为None, 后续会在前次的基础上增加
+        conv_id:            减掉第几个卷积层的参数
+        resume:             第一次更新mask的时候，为None, 后续会在前次的基础上增加
+        param_per_cov:      每一层有多少参数
         """
         params = self.model.parameters()
-        prefix = "rank_conv\\" + arch + "\\rank_conv"  # 根据rank_conv和compress_rate删减filter
+        # prefix = "rank_conv\\" + arch + "\\rank_conv"
+        prefix = os.path.join('rank_conv', arch, 'rank_conv')  # 根据rank_conv和compress_rate删减filter
         subfix = ".npy"
 
         if resume:
@@ -50,14 +53,8 @@ class GeneratorMask:
         else:
             resume = self.job_dir + '\\mask'
 
-        remain_weights_file = self.job_dir + '\\remain_weights'  # 保存裁剪后的权重
-        if not os.path.exists(remain_weights_file):
-            remain_weights = {}
-        else:
-            with open(remain_weights_file, 'rb') as f:
-                remain_weights = pickle.load(f)
-
         self.param_per_cov = param_per_cov  # 有多少个卷积层
+        prune_one_size = False  # 是否裁剪卷积核为1x1的filter
         for index, item in enumerate(params):  # 逐层遍历模型的参数
             if index == cov_id * param_per_cov:
                 break
@@ -73,21 +70,12 @@ class GeneratorMask:
                 self.mask[index] = zeros  # convolutional weight
                 item.data = item.data * self.mask[index]
             elif (cov_id - 1) * param_per_cov < index < cov_id * param_per_cov:
-                # 当前层的权重为 BN 的 bias 和 weight
+                # 当前层的权重为 BN 的 bias 和 weight，选择和前一层Conv相同的裁剪mask
                 self.mask[index] = torch.squeeze(zeros)
                 item.data = item.data * self.mask[index].to(self.device)
 
-            # 实施裁剪，将 mask[i] = 0 的过滤
-            if (cov_id - 1) * param_per_cov <= index < cov_id * param_per_cov:
-                select_idx = torch.tensor([i for i in range(len(self.mask[index])) if self.mask[index][i] == 1],
-                                          dtype=torch.int)
-                res = torch.index_select(item.data, 0, select_idx)
-                remain_weights[index] = res
-
         with open(resume, "wb") as f:  # 保存 mask 至本地
             pickle.dump(self.mask, f)
-        with open(remain_weights_file, "wb") as f:  # 将裁剪后的重要的权重，保存在本地
-            pickle.dump(remain_weights, f)
 
     def grad_mask(self, cov_id):
         params = self.model.parameters()
@@ -98,19 +86,56 @@ class GeneratorMask:
             item.data = item.data * cur_mask.to(self.device)  # 与权重mask相乘,减掉的权重置0,维度保持不变
 
 
-def generator_pruned_model(config_file, mask_dir=None):
+def generator_pruned_model(pruned_ckpt, config_file, mask_dir):
     """
     根据 mask 和 模型的权重 生成裁剪后的权重信息
     并生成裁剪后模型的相关信息
     """
     module_defs = parse_model_config(config_file)  # 模型每层的定义
-    model = gen_model.GenModel(module_defs)
-    torchsummary.summary(model, (3, 412, 412))
-    torch.save(model.state_dict(), 's.pt')
-    with open(mask_dir, 'rb') as f:
-        remain_weights = pickle.load(f)
+    pretrain_weight = torch.load(pruned_ckpt, map_location='cpu')['state_dict']
+    with open(mask_dir, 'rb') as f:  # 每个卷积核是否要选择的mask
+        mask = pickle.load(f)
+
+    # 修剪权重
+    idx = 0
+    conv_filters = []  # 裁剪后每层卷积层的filter数量
+    new_weight = copy.deepcopy(pretrain_weight)
+    per_layer_params = 6  # 多少个单元共用一个 mask
+    select_idx = torch.tensor([i for i in range(int(module_defs[0]['channels']))], dtype=torch.int)
+    for i, (k, v) in enumerate(pretrain_weight.items()):
+        if (i + 1) % per_layer_params == 1:  # 下一层卷积层的由于前一层输入发生了改变，因此也要裁剪
+            v = torch.index_select(v.data, 1, select_idx)
+        if idx >= len(mask):
+            new_weight[k] = v
+            break
+        if (i + 1) % per_layer_params == 0:
+            conv_filters.append(int(torch.sum(mask[idx]).item()))
+            idx += 3  # mask为每三个一个单元, conv、bn-weight、bn-bias
+            continue
+        select_idx = torch.tensor([i for i in range(len(mask[idx])) if mask[idx][i] == 1],
+                                  dtype=torch.int)
+        v = torch.index_select(v.data, 0, select_idx)
+        new_weight[k] = v
+
+    torch.save({'state_dict': new_weight}, 'pruned_ckpt.pt')  # 重新保存模型的参数
+    filter_idx = 0  # 根据索引判定每层卷积层，剪枝后的filter数量，重新生成配置文件
+    with open('pruned_arc.cfg', 'w') as f:
+        for module_def in module_defs:
+            f.write(f"[{module_def['type']}]\n")
+            for key, value in module_def.items():
+                if key != 'type':
+                    if module_def['type'] == 'convolutional' and key == 'filters':
+                        if filter_idx >= len(conv_filters):
+                            f.write(f"{key}={value}\n")
+                        else:
+                            f.write(f"{key}={conv_filters[filter_idx]}\n")
+                            filter_idx += 1
+                    else:
+                        f.write(f"{key}={value}\n")
+            f.write("\n")
     return
 
 
 if __name__ == '__main__':
-    generator_pruned_model('model.cfg')
+    generator_pruned_model('mnist.pt', 'model.cfg',
+                           r'D:\LasoFiles\test_git\cvmodule\Compression\pruning\mnist_mask\mask')

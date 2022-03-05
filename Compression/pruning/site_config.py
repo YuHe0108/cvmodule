@@ -86,5 +86,4 @@ def generator_config(module_defs, cfg_file, mask=None):
     return cfg_file
 
 
-if __name__ == '__main__':
-    pass
+
