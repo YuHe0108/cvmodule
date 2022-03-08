@@ -124,7 +124,7 @@ def generator_pruned_model(pruned_ckpt, config_file, mask_dir):
         new_weight[k] = v
 
     torch.save({'state_dict': new_weight}, 'pruned_ckpt.pt')  # 保存已经剪枝后模型的参数
-    filter_idx = 0  # 根据索引判定每层卷积层，剪枝后的filter数量，重新生成配置文件
+    filter_idx = 0  # 根据索引判定每层卷积 层，剪枝后的filter数量，重新生成配置文件
     with open('pruned_arc.cfg', 'w') as f:
         for module_def in module_defs:
             f.write(f"[{module_def['type']}]\n")
