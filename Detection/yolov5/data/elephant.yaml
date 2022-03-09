@@ -1,0 +1,10 @@
+# train and val datasets (image directory or *.txt file with image paths)
+train:  D:\LasoFiles\Github\DL\yolov5-master_elephant\data\train.txt
+val:    D:\LasoFiles\Github\DL\yolov5-master_elephant\data\test.txt
+test:   D:\LasoFiles\Github\DL\yolov5-master_elephant\data\test.txt
+
+# number of classes
+nc: 1
+
+# class names
+names: [ 'Elephant' ]

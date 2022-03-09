@@ -1,4 +1,4 @@
-from components.utils import *
+from Detection.yolov5.components.utils import *
 
 """
 YOLO-v5 模型的组成单元

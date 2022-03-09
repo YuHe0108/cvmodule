@@ -5,6 +5,7 @@ import math
 
 epsilon = 1e-5
 
+"""不同IOU的计算方式"""
 
 def IoU(box1, box2, wh=False):
     if wh:

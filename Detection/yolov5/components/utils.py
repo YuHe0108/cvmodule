@@ -226,24 +226,25 @@ def compute_ap(recall, precision):
 
 
 def bbox_iou(box1, box2, x1y1x2y2=True, GIoU=False, DIoU=False, CIoU=False):
-    # Returns the IoU of box1 to box2. box1 is 4, box2 is nx4
+    """
+    用于计算两个矩形框的IOU, 包括：G_iou 、D_iou、C_iou
+    Returns the IoU of box1 to box2. box1 is 4, box2 is nx4
+    """
     box2 = box2.t()
-
-    # Get the coordinates of bounding boxes
+    # 获取矩形框对角坐标: Get the coordinates of bounding boxes
     if x1y1x2y2:  # x1, y1, x2, y2 = box1
         b1_x1, b1_y1, b1_x2, b1_y2 = box1[0], box1[1], box1[2], box1[3]
         b2_x1, b2_y1, b2_x2, b2_y2 = box2[0], box2[1], box2[2], box2[3]
-    else:  # transform from xywh to xyxy
+    else:  # transform from x-y-w-h to xyxy
         b1_x1, b1_x2 = box1[0] - box1[2] / 2, box1[0] + box1[2] / 2
         b1_y1, b1_y2 = box1[1] - box1[3] / 2, box1[1] + box1[3] / 2
         b2_x1, b2_x2 = box2[0] - box2[2] / 2, box2[0] + box2[2] / 2
         b2_y1, b2_y2 = box2[1] - box2[3] / 2, box2[1] + box2[3] / 2
 
-    # Intersection area
+    # 交集：Intersection area
     inter = (torch.min(b1_x2, b2_x2) - torch.max(b1_x1, b2_x1)).clamp(0) * \
             (torch.min(b1_y2, b2_y2) - torch.max(b1_y1, b2_y1)).clamp(0)
-
-    # Union Area
+    # 并集：Union Area
     w1, h1 = b1_x2 - b1_x1, b1_y2 - b1_y1
     w2, h2 = b2_x2 - b2_x1, b2_y2 - b2_y1
     union = (w1 * h1 + 1e-16) + w2 * h2 - inter
@@ -256,9 +257,8 @@ def bbox_iou(box1, box2, x1y1x2y2=True, GIoU=False, DIoU=False, CIoU=False):
             c_area = cw * ch + 1e-16  # convex area
             return iou - (c_area - union) / c_area  # GIoU
         if DIoU or CIoU:  # Distance or Complete IoU https://arxiv.org/abs/1911.08287v1
-            # convex diagonal squared
-            c2 = cw ** 2 + ch ** 2 + 1e-16
-            # centerpoint distance squared
+            c2 = cw ** 2 + ch ** 2 + 1e-16  # convex diagonal squared
+            # center-point distance squared
             rho2 = ((b2_x1 + b2_x2) - (b1_x1 + b1_x2)) ** 2 / 4 + ((b2_y1 + b2_y2) - (b1_y1 + b1_y2)) ** 2 / 4
             if DIoU:
                 return iou - rho2 / c2  # DIoU
@@ -267,7 +267,6 @@ def bbox_iou(box1, box2, x1y1x2y2=True, GIoU=False, DIoU=False, CIoU=False):
                 with torch.no_grad():
                     alpha = v / (1 - iou + v)
                 return iou - (rho2 / c2 + v * alpha)  # CIoU
-
     return iou
 
 
@@ -339,7 +338,11 @@ def smooth_BCE(eps=0.1):  # https://github.com/ultralytics/yolov3/issues/238#iss
     return 1.0 - 0.5 * eps, 0.5 * eps
 
 
-def compute_loss(p, targets, model):  # predictions, targets, model
+def compute_loss(p, targets, model):
+    """
+    计算模型的损失值
+    predictions, targets, model
+    """
     ft = torch.cuda.FloatTensor if p[0].is_cuda else torch.Tensor
     lcls, lbox, lobj = ft([0]), ft([0]), ft([0])
     tcls, tbox, indices, anchors = build_targets(p, targets, model)  # targets
@@ -373,18 +376,15 @@ def compute_loss(p, targets, model):  # predictions, targets, model
             pxy = ps[:, :2].sigmoid() * 2. - 0.5
             pwh = (ps[:, 2:4].sigmoid() * 2) ** 2 * anchors[i]
             pbox = torch.cat((pxy, pwh), 1)  # predicted box
-            giou = bbox_iou(pbox.t(), tbox[i], x1y1x2y2=False, GIoU=True)  # giou(prediction, target)
+            giou = bbox_iou(pbox.t(), tbox[i], x1y1x2y2=False, CIoU=True)  # giou(prediction, target)
             lbox += (1.0 - giou).sum() if red == 'sum' else (1.0 - giou).mean()  # giou loss
-
             # Obj
             tobj[b, a, gj, gi] = (1.0 - model.gr) + model.gr * giou.detach().clamp(0).type(tobj.dtype)  # giou ratio
-
             # Class
             if model.nc > 1:  # cls loss (only if multiple classes)
                 t = torch.full_like(ps[:, 5:], cn)  # targets
                 t[range(nb), tcls[i]] = cp
                 lcls += BCEcls(ps[:, 5:], t)  # BCE
-
             # Append targets to text file
             # with open('targets.txt', 'a') as file:
             #     [file.write('%11.5g ' * 4 % tuple(x) + '\n') for x in torch.cat((txy[i], twh[i]), 1)]
@@ -401,7 +401,6 @@ def compute_loss(p, targets, model):  # predictions, targets, model
         if nt:
             lcls *= g / nt / model.nc
             lbox *= g / nt
-
     loss = lbox + lobj + lcls
     return loss * bs, torch.cat((lbox, lobj, lcls, loss)).detach()
 
@@ -811,7 +810,7 @@ def output_to_target(output, width, height):
     return np.array(targets)
 
 
-# Plotting functions ---------------------------------------------------------------------------------------------------
+# ---------------------------------- Plotting functions -----------------------------------------------------
 def butter_lowpass_filtfilt(data, cutoff=1500, fs=50000, order=5):
     # https://stackoverflow.com/questions/28536191/how-to-filter-smooth-with-scipy-numpy
     def butter_lowpass(cutoff, fs, order):
