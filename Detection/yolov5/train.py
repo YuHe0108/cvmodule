@@ -1,23 +1,11 @@
-"""
-Train a YOLOv5 model on a custom dataset.
-
-Models and datasets download automatically from the latest YOLOv5 release.
-Models: https://github.com/ultralytics/yolov5/tree/master/models
-Datasets: https://github.com/ultralytics/yolov5/tree/master/data
-Tutorial: https://github.com/ultralytics/yolov5/wiki/Train-Custom-Data
-
-Usage:
-    $ python path/to/train.py --data coco128.yaml --weights yolov5s.pt --img 640  # from pretrained (RECOMMENDED)
-    $ python path/to/train.py --data coco128.yaml --weights '' --cfg yolov5s.yaml --img 640  # from scratch
-"""
 import os
-import pathlib
 import sys
 import time
 import yaml
 import math
 import torch
 import random
+import pathlib
 import argparse
 import numpy as np
 import torch.nn as nn
@@ -36,9 +24,10 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
+# 自定义文件
 import val  # for end-of-epoch mAP
-from models.experimental import attempt_load
 from models.yolo import Model
+from models.experimental import attempt_load
 from utils.autoanchor import check_anchors
 from utils.autobatch import check_train_batch_size
 from utils.callbacks import Callbacks
@@ -58,6 +47,8 @@ from utils.torch_utils import EarlyStopping, ModelEMA, de_parallel, select_devic
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
 RANK = int(os.getenv('RANK', -1))
 WORLD_SIZE = int(os.getenv('WORLD_SIZE', 1))
+
+print(WORLD_SIZE, RANK)
 
 
 def train(hyp, opt, device, callbacks):
@@ -125,16 +116,16 @@ def train(hyp, opt, device, callbacks):
         csd = intersect_dicts(csd, model.state_dict(), exclude=exclude)  # intersect
         model.load_state_dict(csd, strict=False)  # load
         LOGGER.info(f'Transferred {len(csd)}/{len(model.state_dict())} items from {weights}')  # report
-    else:
-        model = Model(cfg, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # 创建模型-create
 
-    # 冻结模型的某些权重-Freeze
-    freeze = [f'model.{x}.' for x in (freeze if len(freeze) > 1 else range(freeze[0]))]  # layers to freeze
-    for k, v in model.named_parameters():
-        v.requires_grad = True  # train all layers
-        if any(x in k for x in freeze):
-            LOGGER.info(f'freezing {k}')
-            v.requires_grad = False
+        # 只有加在权重的时候，才可以冻结模型的某些权重 - Freeze
+        freeze = [f'model.{x}.' for x in (freeze if len(freeze) > 1 else range(freeze[0]))]  # layers to freeze
+        for k, v in model.named_parameters():
+            v.requires_grad = True  # train all layers
+            if any(x in k for x in freeze):
+                LOGGER.info(f'freezing {k}')
+                v.requires_grad = False
+    else:
+        model = Model(cfg, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # 创建模型并初始化-create
 
     # 输入图像的尺寸 - Image size
     gs = max(int(model.stride.max()), 32)  # grid size (max stride)
@@ -196,7 +187,7 @@ def train(hyp, opt, device, callbacks):
             ema.updates = ckpt['updates']
 
         # 从第几轮开始训练，Epochs
-        ckpt['epoch'] = 2
+        # ckpt['epoch'] = 2
         start_epoch = ckpt['epoch'] + 1
         if resume:
             assert start_epoch > 0, f'{weights} training to {epochs} epochs is finished, nothing to resume.'
@@ -275,9 +266,8 @@ def train(hyp, opt, device, callbacks):
                 f'Using {train_loader.num_workers * WORLD_SIZE} dataloader workers\n'
                 f"Logging results to {colorstr('bold', save_dir)}\n"
                 f'Starting training for {epochs} epochs...')
-    for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
+    for epoch in range(start_epoch, epochs):  # ------- epoch -----------
         model.train()
-
         # Update image weights (optional, single-GPU only)
         if opt.image_weights:
             cw = model.class_weights.cpu().numpy() * (1 - maps) ** 2 / nc  # class weights
@@ -383,7 +373,7 @@ def train(hyp, opt, device, callbacks):
             log_vals = list(mloss) + list(results) + lr
             callbacks.run('on_fit_epoch_end', log_vals, epoch, best_fitness, fi)
 
-            # Save model
+            # 保存模型:Save model
             if (not nosave) or (final_epoch and not evolve):  # if save
                 ckpt = {'epoch': epoch,
                         'best_fitness': best_fitness,
@@ -418,7 +408,8 @@ def train(hyp, opt, device, callbacks):
         #    break  # must break all DDP ranks
 
         # end epoch ----------------------------------------------------------------------------------------------------
-    # end training -----------------------------------------------------------------------------------------------------
+
+    # 结束训练过程
     if RANK in [-1, 0]:
         LOGGER.info(f'\n{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.')
         for f in last, best:

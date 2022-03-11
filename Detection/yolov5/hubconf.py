@@ -1,4 +1,3 @@
-# YOLOv5 🚀 by Ultralytics, GPL-3.0 license
 """
 PyTorch Hub models https://pytorch.org/hub/ultralytics_yolov5/
 
@@ -12,8 +11,8 @@ import torch
 
 
 def _create(name, pretrained=True, channels=3, classes=80, autoshape=True, verbose=True, device=None):
-    """Creates or loads a YOLOv5 model
-
+    """初始化 或者 加载一个训练好的模型
+    Creates or loads a YOLOv5 model
     Arguments:
         name (str): model name 'yolov5s' or path 'path/to/best.pt'
         pretrained (bool): load pretrained weights into the model
@@ -125,11 +124,10 @@ if __name__ == '__main__':
     # model = custom(path='path/to/model.pt')  # custom
 
     # Verify inference
-    from pathlib import Path
-
     import cv2
     import numpy as np
     from PIL import Image
+    from pathlib import Path
 
     imgs = ['data/images/zidane.jpg',  # filename
             Path('data/images/zidane.jpg'),  # Path

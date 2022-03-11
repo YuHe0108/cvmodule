@@ -1,4 +1,5 @@
 """
+能够针对图像、视频、网络地址信息进行 检测
 Run inference on images, videos, directories, streams, etc.
 
 Usage - sources:
@@ -22,16 +23,16 @@ Usage - formats:
                                          yolov5s.tflite             # TensorFlow Lite
                                          yolov5s_edgetpu.tflite     # TensorFlow Edge TPU
 """
-
-import argparse
 import os
 import sys
+import argparse
 from pathlib import Path
 
 import cv2
 import torch
 import torch.backends.cudnn as cudnn
 
+# 添加文件的路径至 sys, 从而可以从相对位置引用
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
@@ -61,7 +62,7 @@ def run(weights=ROOT / 'yolov5l.pt',  # model.pt path(s)
         save_crop=False,  # save cropped prediction boxes
         nosave=False,  # do not save images/videos
         classes=None,  # filter by class: --class 0, or --class 0 2 3
-        agnostic_nms=False,  # class-agnostic NMS
+        agnostic_nms=False,  # True表示多个类一起计算nms，False表示按照不同的类分别进行计算 nms class-agnostic NMS
         augment=False,  # augmented inference
         visualize=False,  # visualize features
         update=False,  # update all models
@@ -74,12 +75,13 @@ def run(weights=ROOT / 'yolov5l.pt',  # model.pt path(s)
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
         ):
+    # 验证输入的数据信息
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
     is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
     webcam = source.isnumeric() or source.endswith('.txt') or (is_url and not is_file)
-    if is_url and is_file:
+    if is_url and is_file:  # 如果是网络信息则下载
         source = check_file(source)  # download
 
     # Directories
@@ -108,12 +110,25 @@ def run(weights=ROOT / 'yolov5l.pt',  # model.pt path(s)
         dataset = LoadStreams(source, img_size=imgsz, stride=stride, auto=pt)
         bs = len(dataset)  # batch_size
     else:
+        '''
+        dataset 是一个迭代器，逐张图像进行检测，因此数据集的batch_size = 1, 每次迭代返回一个tuple
+        x[0]: 数据集在本地的绝对路径
+        x[1]: 缩放后图像的尺寸(宽高的比值不变)
+        x[2]: 原始图像的尺寸
+        x[3]: 非视频文件，当前值是 None
+        x[4]: 当前图像是总待检测图像的第几张
+        '''
         dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt)
         bs = 1  # batch_size
     vid_path, vid_writer = [None] * bs, [None] * bs
 
     # Run inference
     model.warmup(imgsz=(1 if pt else bs, 3, *imgsz), half=half)  # warmup
+    '''
+    dt[0]: 将图像转换为tensor时间
+    dt[1]: 模型前向传播时间
+    dt[3]: nms花费时间
+    '''
     dt, seen = [0.0, 0.0, 0.0], 0
     for path, im, im0s, vid_cap, s in dataset:
         t1 = time_sync()
@@ -132,6 +147,13 @@ def run(weights=ROOT / 'yolov5l.pt',  # model.pt path(s)
         dt[1] += t3 - t2
 
         # NMS
+        '''
+        经过NMS之后，返回一个列表
+        pred[0][0]：长度为6的列表
+        0:4：       前四个元素是边框的信息
+        5:          置信度
+        6:          类别
+        '''
         pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
         dt[2] += time_sync() - t3
 
@@ -147,15 +169,15 @@ def run(weights=ROOT / 'yolov5l.pt',  # model.pt path(s)
             else:
                 p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 0)
 
-            p = Path(p)  # to Path
+            p = Path(p)  # 原始图像的路径 to Path
             save_path = str(save_dir / p.name)  # im.jpg
             txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
-            s += '%gx%g ' % im.shape[2:]  # print string
+            s += '%gx%g ' % im.shape[2:]  # 打印的信息：第几张图像、图像路径、图像尺寸 print string
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
             if len(det):
-                # Rescale boxes from img_size to im0 size
+                # 将预测的目标中心 + 边框信息 放缩到与原图一致 Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
 
                 # Print results
@@ -214,48 +236,49 @@ def run(weights=ROOT / 'yolov5l.pt',  # model.pt path(s)
         LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
     if update:
         strip_optimizer(weights)  # update model (to fix SourceChangeWarning)
+    return
 
 
 def parse_opt():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', nargs='+', type=str,
-                        default=os.path.join(ROOT, 'weights', 'best.pt'), help='model path(s)')
-    parser.add_argument('--source', type=str, default=ROOT / 'data\\images', help='file/dir/URL/glob, 0 for webcam')
-    parser.add_argument('--data', type=str, default=ROOT / 'data\\elephant.yaml', help='(optional) dataset.yaml path')
+    parser.add_argument('--weights', nargs='+', type=str, default=os.path.join(ROOT, 'weights', 'best.pt'),
+                        help='模型的权重信息 model path(s)')
+    parser.add_argument('--source', type=str, default=os.path.join(ROOT, 'data', 'images'),
+                        help='待检测数据 file/dir/URL/glob, 0 for webcam')
+    parser.add_argument('--data', type=str, default=os.path.join(ROOT, 'data', 'elephant.yaml'),
+                        help='数据集相关信息 (optional) dataset.yaml path')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
-    parser.add_argument('--conf-thres', type=float, default=0.7, help='confidence threshold')
-    parser.add_argument('--iou-thres', type=float, default=0.7, help='NMS IoU threshold')
+    parser.add_argument('--project', default=os.path.join(ROOT, 'runs', 'detect'), help='save results to project/name')
+    parser.add_argument('--name', default='exp', help='save results to project/name')
+    parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
+
+    parser.add_argument('--conf-thres', type=float, default=0.3, help='confidence threshold')
+    parser.add_argument('--iou-thres', type=float, default=0.3, help='NMS IoU threshold')
     parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
-    parser.add_argument('--view-img', action='store_true', help='show results')
-    parser.add_argument('--save-txt', action='store_true', help='save results to *.txt')
-    parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels')
-    parser.add_argument('--save-crop', action='store_true', help='save cropped prediction boxes')
-    parser.add_argument('--nosave', action='store_true', help='do not save images/videos')
+
+    parser.add_argument('--view-img', action='store_true', default=False, help='show results')
+    parser.add_argument('--save-txt', action='store_true', default=False, help='save results to *.txt')
+    parser.add_argument('--save-conf', action='store_true', default=False, help='save confidences in --save-txt labels')
+    parser.add_argument('--save-crop', action='store_true', default=False, help='save cropped prediction boxes')
+    parser.add_argument('--nosave', action='store_true', default=False, help='do not save images/videos')
     parser.add_argument('--classes', nargs='+', type=int, help='filter by class: --classes 0, or --classes 0 2 3')
-    parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
+    parser.add_argument('--agnostic-nms', action='store_true', default=False, help='class-agnostic NMS')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--visualize', action='store_true', help='visualize features')
     parser.add_argument('--update', action='store_true', help='update all models')
-    parser.add_argument('--project', default=ROOT / 'runs/detect', help='save results to project/name')
-    parser.add_argument('--name', default='exp', help='save results to project/name')
-    parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--line-thickness', default=3, type=int, help='bounding box thickness (pixels)')
     parser.add_argument('--hide-labels', default=False, action='store_true', help='hide labels')
     parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences')
-    parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
-    parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
+    parser.add_argument('--half', action='store_true', default=False, help='use FP16 half-precision inference')
+    parser.add_argument('--dnn', action='store_true', default=False, help='use OpenCV DNN for ONNX inference')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(FILE.stem, opt)
     return opt
 
 
-def main(opt):
-    check_requirements(exclude=('tensorboard', 'thop'))
-    run(**vars(opt))
-
-
 if __name__ == "__main__":
-    opt = parse_opt()
-    main(opt)
+    check_requirements(exclude=('tensorboard', 'thop'))
+    opt_ = parse_opt()
+    run(**vars(opt_))

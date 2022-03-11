@@ -130,24 +130,58 @@ class ComputeLoss:
         device = targets.device
         lcls, lbox, lobj = torch.zeros(1, device=device), torch.zeros(1, device=device), torch.zeros(1, device=device)
         tcls, tbox, indices, anchors = self.build_targets(p, targets)  # targets
+        '''
+        从build_targets函数中构建目标标签，获取标签中的tcls, tbox, indices, anchors
+            tcls = [[cls1,cls2,...],[cls1,cls2,...],[cls1,cls2,...]] 每个anchor对应的类别
+            tcls.shape = [nl, N]
+            tbox = [[[gx1,gy1,gw1,gh1],[gx2,gy2,gw2,gh2],...], # 中心点的偏移量、宽高
+    
+            indices = [[image indices1,anchor indices1, gridj1, gridi1],
+                       [image indices2,anchor indices2, gridj2, gridi2],
+                       ...]] # anchor所属batch图像idx、用到了哪个anchor、中心点坐标距左上角的距离
+            anchors = [[aw1,ah1],[aw2,ah2],...]		  
+        '''
 
         # Losses
         for i, pi in enumerate(p):  # layer index, layer predictions
+            '''
+            p.shape = [nl,bs,na,nx,ny,no]
+            nl 为 预测层数，一般为3
+            na 为 每层预测层的anchor数，一般为3
+            nx,ny 为 grid的 w和 h
+            no 为 输出数，为 5 + nc (5:x,y,w,h,obj, nc:分类数)
+            
+            a:      所有anchor的索引
+            b:      标签所属image的索引
+            gridy:  标签所在grid的y，在0到ny-1之间
+            gridy:  标签所在grid的x，在0到nx-1之间
+            
+            pi.shape = [bs,na,nx,ny,no]
+            tobj.shape = [bs,na,nx,ny]
+            '''
             b, a, gj, gi = indices[i]  # image, anchor, gridy, gridx
             tobj = torch.zeros_like(pi[..., 0], device=device)  # target obj
 
             n = b.shape[0]  # number of targets
             if n:
+                '''
+                ps为batch中第b个图像第a个anchor的第gj行第gi列的output
+                ps.shape = [N,5+nc], N = a[0].shape，即符合anchor大小的所有标签数
+                '''
                 ps = pi[b, a, gj, gi]  # prediction subset corresponding to targets
 
-                # Regression
+                ''' # Regression
+                xy的预测范围为-0.5~1.5
+                wh的预测范围是0~4倍anchor的w和h，
+                原理在代码后讲述。
+                '''
                 pxy = ps[:, :2].sigmoid() * 2 - 0.5
                 pwh = (ps[:, 2:4].sigmoid() * 2) ** 2 * anchors[i]
                 pbox = torch.cat((pxy, pwh), 1)  # predicted box
                 iou = bbox_iou(pbox.T, tbox[i], x1y1x2y2=False, CIoU=True)  # iou(prediction, target)
                 lbox += (1.0 - iou).mean()  # iou loss
 
-                # Objectness
+                # 通过gr用来设置IoU的值在object-ness loss中做标签的比重, Object-ness
                 score_iou = iou.detach().clamp(0).type(tobj.dtype)
                 if self.sort_obj_iou:
                     sort_id = torch.argsort(score_iou)
@@ -156,6 +190,11 @@ class ComputeLoss:
 
                 # Classification
                 if self.nc > 1:  # cls loss (only if multiple classes)
+                    '''
+                    ps[:, 5:].shape = [N,nc],用 self.cn 来填充型为[N,nc]得Tensor。
+                    self.cn 通过smooth_BCE平滑标签得到的，使得负样本不再是0，而是0.5 * eps
+                    self.cp 通过smooth_BCE平滑标签得到的，使得正样本不再是1，而是1.0 - 0.5 * eps
+                    '''
                     t = torch.full_like(ps[:, 5:], self.cn, device=device)  # targets
                     t[range(n), tcls[i]] = self.cp
                     lcls += self.BCEcls(ps[:, 5:], t)  # BCE
@@ -164,6 +203,11 @@ class ComputeLoss:
                 # with open('targets.txt', 'a') as file:
                 #     [file.write('%11.5g ' * 4 % tuple(x) + '\n') for x in torch.cat((txy[i], twh[i]), 1)]
 
+            '''
+            pi[..., 4]所存储的是预测的obj
+            self.balance[i]为第i层输出层所占的权重
+            将每层的损失乘上权重计算得到obj损失
+            '''
             obji = self.BCEobj(pi[..., 4], tobj)
             lobj += obji * self.balance[i]  # obj loss
             if self.autobalance:

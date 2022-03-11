@@ -1,25 +1,20 @@
-# YOLOv5 🚀 by Ultralytics, GPL-3.0 license
-"""
-PyTorch utils
-"""
-
-import datetime
-import math
 import os
-import platform
-import subprocess
 import time
+import math
+import datetime
+import platform
 import warnings
-from contextlib import contextmanager
-from copy import deepcopy
+import subprocess
 from pathlib import Path
+from copy import deepcopy
+from contextlib import contextmanager
 
 import torch
 import torch.distributed as dist
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils.general import LOGGER
+from Detection.yolov5.utils.general import LOGGER
 
 try:
     import thop  # for FLOPs computation
@@ -306,7 +301,7 @@ class ModelEMA:
         self.ema = deepcopy(de_parallel(model)).eval()  # FP32 EMA
         # if next(model.parameters()).device.type != 'cpu':
         #     self.ema.half()  # FP16 EMA
-        self.updates = updates  # number of EMA updates
+        self.updates = updates  # 更新的次数 number of EMA updates
         self.decay = lambda x: decay * (1 - math.exp(-x / tau))  # decay exponential ramp (to help early epochs)
         for p in self.ema.parameters():
             p.requires_grad_(False)

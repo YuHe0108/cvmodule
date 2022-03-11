@@ -1,4 +1,3 @@
-# YOLOv5 🚀 by Ultralytics, GPL-3.0 license
 """
 Validate a trained YOLOv5 model accuracy on a custom dataset
 
@@ -17,17 +16,15 @@ Usage - formats:
                                       yolov5s.tflite             # TensorFlow Lite
                                       yolov5s_edgetpu.tflite     # TensorFlow Edge TPU
 """
-
-import argparse
-import json
 import os
 import sys
+import json
+import torch
+import argparse
+import numpy as np
+from tqdm import tqdm
 from pathlib import Path
 from threading import Thread
-
-import numpy as np
-import torch
-from tqdm import tqdm
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
@@ -380,6 +377,7 @@ def main(opt):
                 np.savetxt(f, y, fmt='%10.4g')  # save
             os.system('zip -r study.zip study_*.txt')
             plot_val_study(x=x)  # plot
+    return
 
 
 if __name__ == "__main__":

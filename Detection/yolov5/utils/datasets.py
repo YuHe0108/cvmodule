@@ -2,34 +2,35 @@
 """
 Dataloaders and dataset utils
 """
-
+import os
 import glob
-import hashlib
 import json
 import math
-import os
+import time
 import random
 import shutil
-import time
+import hashlib
+from pathlib import Path
+from zipfile import ZipFile
+from threading import Thread
 from itertools import repeat
 from multiprocessing.pool import Pool, ThreadPool
-from pathlib import Path
-from threading import Thread
-from zipfile import ZipFile
 
 import cv2
-import numpy as np
-import torch
-import torch.nn.functional as F
 import yaml
+import torch
+import numpy as np
+from tqdm import tqdm
+import torch.nn.functional as F
 from PIL import ExifTags, Image, ImageOps
 from torch.utils.data import DataLoader, Dataset, dataloader, distributed
-from tqdm import tqdm
 
-from utils.augmentations import Albumentations, augment_hsv, copy_paste, letterbox, mixup, random_perspective
-from utils.general import (DATASETS_DIR, LOGGER, NUM_THREADS, check_dataset, check_requirements, check_yaml, clean_str,
-                           segments2boxes, xyn2xy, xywh2xyxy, xywhn2xyxy, xyxy2xywhn)
-from utils.torch_utils import torch_distributed_zero_first
+from Detection.yolov5.utils.augmentations import (Albumentations, augment_hsv, copy_paste,
+                                                  letterbox, mixup, random_perspective)
+from Detection.yolov5.utils.general import (DATASETS_DIR, LOGGER, NUM_THREADS, check_dataset,
+                                            check_requirements, check_yaml, clean_str,
+                                            segments2boxes, xyn2xy, xywh2xyxy, xywhn2xyxy, xyxy2xywhn)
+from Detection.yolov5.utils.torch_utils import torch_distributed_zero_first
 
 # Parameters
 HELP_URL = 'https://github.com/ultralytics/yolov5/wiki/Train-Custom-Data'

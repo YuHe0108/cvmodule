@@ -29,8 +29,8 @@ import torch
 import torchvision
 import yaml
 
-from utils.downloads import gsutil_getsize
-from utils.metrics import box_iou, fitness
+from Detection.yolov5.utils.downloads import gsutil_getsize
+from Detection.yolov5.utils.metrics import box_iou, fitness
 
 # Settings
 FILE = Path(__file__).resolve()
@@ -674,18 +674,38 @@ def clip_coords(boxes, shape):
         boxes[:, [1, 3]] = boxes[:, [1, 3]].clip(0, shape[0])  # y1, y2
 
 
-def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=None, agnostic=False, multi_label=False,
-                        labels=(), max_det=300):
+def non_max_suppression(prediction,
+                        conf_thres=0.25,
+                        iou_thres=0.45,
+                        classes=None,
+                        agnostic=False,
+                        multi_label=False,
+                        labels=(),
+                        max_det=300):
     """Runs Non-Maximum Suppression (NMS) on inference results
-
+    args:
+        prediction:     模型的预测值 [1, n_obj, 6], obj: 模型探测到目标的数量
+        conf_thres:     置信度的阈值
+        iou_thres:      iou的阈值
+        max_det:        最多检测多少个目标
     Returns:
          list of detections, on (n,6) tensor per image [xyxy, conf, cls]
     """
-
+    '''
+    pred 的 shape 是 (1, num_boxes, 5+num_class)
+    num_boxes 为模型在 3 个特征图上预测出来的框的个数，num_boxes = h/32 * w/32 + h/16 * w/16 + h/8 * w/8
+    5 + num_class的值为：
+        pred[..., 0:4]    为预测框坐标, 预测框坐标为xywh(中心点+宽长)格式, 与预测的原图大小匹配，没有缩放
+        pred[..., 4]      为object-ness置信度
+        pred[..., 5:]     为分类结果
+        
+    nc: 模型预测的类别有多少种
+    xc: 先过滤掉 置信度 conf < 阈值
+    '''
     nc = prediction.shape[2] - 5  # number of classes
-    xc = prediction[..., 4] > conf_thres  # candidates
+    xc = prediction[..., 4] > conf_thres  # 置信度大于阈值的候选框 candidates
 
-    # Checks
+    # 检测两个阈值是否都在 0~1之间 Checks
     assert 0 <= conf_thres <= 1, f'Invalid Confidence threshold {conf_thres}, valid values are between 0.0 and 1.0'
     assert 0 <= iou_thres <= 1, f'Invalid IoU {iou_thres}, valid values are between 0.0 and 1.0'
 
@@ -694,17 +714,21 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
     max_nms = 30000  # maximum number of boxes into torchvision.ops.nms()
     time_limit = 10.0  # seconds to quit after
     redundant = True  # require redundant detections
-    multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
+    multi_label &= nc > 1  # 每个框中不止一个目标, multiple labels per box (adds 0.5ms/img)
     merge = False  # use merge-NMS
 
     t = time.time()
+    '''
+    输出output是一个列表，长度为 batch_size
+    每个列表的元素长度为 6 位
+    '''
     output = [torch.zeros((0, 6), device=prediction.device)] * prediction.shape[0]
     for xi, x in enumerate(prediction):  # image index, image inference
         # Apply constraints
         x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0  # width-height
-        x = x[xc[xi]]  # confidence
+        x = x[xc[xi]]  # [N, 6]: 边框的尺寸在合适的范围内，并且置信度高于阈值 confidence
 
-        # Cat apriori labels if autolabelling
+        # Cat apriori labels if auto-labelling
         if labels and len(labels[xi]):
             lb = labels[xi]
             v = torch.zeros((len(lb), nc + 5), device=x.device)
@@ -713,25 +737,25 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
             v[range(len(lb)), lb[:, 0].long() + 5] = 1.0  # cls
             x = torch.cat((x, v), 0)
 
-        # If none remain process next image
+        # 如果预测的结果都不符合条件，则直接处理下一张图像 If none remain process next image
         if not x.shape[0]:
             continue
 
-        # Compute conf
+        # 每个分类结果 * 置信度 Compute conf
         x[:, 5:] *= x[:, 4:5]  # conf = obj_conf * cls_conf
 
-        # Box (center x, center y, width, height) to (x1, y1, x2, y2)
+        # 转换成 左上-右下 的两点式, Box (center x, center y, width, height) to (x1, y1, x2, y2)
         box = xywh2xyxy(x[:, :4])
 
         # Detections matrix nx6 (xyxy, conf, cls)
-        if multi_label:
+        if multi_label:  # 是否一个框内有多个目标
             i, j = (x[:, 5:] > conf_thres).nonzero(as_tuple=False).T
             x = torch.cat((box[i], x[i, j + 5, None], j[:, None].float()), 1)
-        else:  # best class only
-            conf, j = x[:, 5:].max(1, keepdim=True)
+        else:  # 如果一个框内，只有一个目标，则选择置信度最大的那个。best class only
+            conf, j = x[:, 5:].max(1, keepdim=True)  # conf: 所属类别置信度，j: 所属类别idx
             x = torch.cat((box, conf, j.float()), 1)[conf.view(-1) > conf_thres]
 
-        # Filter by class
+        # 过滤掉不需要检测的类别。Filter by class
         if classes is not None:
             x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device)).any(1)]
 
@@ -740,14 +764,18 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
         #     x = x[torch.isfinite(x).all(1)]
 
         # Check shape
-        n = x.shape[0]  # number of boxes
+        n = x.shape[0]  # 最终剩下的预测框数量。number of boxes
         if not n:  # no boxes
             continue
-        elif n > max_nms:  # excess boxes
+        elif n > max_nms:  # 如果剩下框的数量大于max_num, 则排序后选择前max_nms个，excess boxes
             x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence
 
-        # Batched NMS
-        c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
+        #  Batched NMS
+        '''
+        agnostic == False, 在添加了偏移量之后，NMS只在相同类之间起作用，
+        即: 如果一个中心有两个框，但是框中的目标不同，会同时保留这两个框
+        '''
+        c = x[:, 5:6] * (0 if agnostic else max_wh)  # 每个框所属类别，如果agnostic, 所有类别全为0, classes
         boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
         i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
         if i.shape[0] > max_det:  # limit detections
@@ -764,7 +792,6 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
         if (time.time() - t) > time_limit:
             LOGGER.warning(f'WARNING: NMS time limit {time_limit}s exceeded')
             break  # time limit exceeded
-
     return output
 
 

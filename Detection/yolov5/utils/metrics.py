@@ -13,7 +13,11 @@ import torch
 
 
 def fitness(x):
-    # Model fitness as a weighted combination of metrics
+    """
+    Model fitness as a weighted combination of metrics
+    模型拟合情况的好坏用多组指标的加权平均衡量
+    res = w[0] * precision + w[1] * recall + w[2] * mAP@0.5 + w[3] * mAP@0.5:0.95
+    """
     w = [0.0, 0.0, 0.1, 0.9]  # weights for [P, R, mAP@0.5, mAP@0.5:0.95]
     return (x[:, :4] * w).sum(1)
 
@@ -22,8 +26,8 @@ def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names
     """ Compute the average precision, given the recall and precision curves.
     Source: https://github.com/rafaelpadilla/Object-Detection-Metrics.
     # Arguments
-        tp:  True positives (nparray, nx1 or nx10).
-        conf:  Objectness value from 0-1 (nparray).
+        tp:     True positives (nparray, nx1 or nx10).
+        conf:   Objectness value from 0-1 (nparray).
         pred_cls:  Predicted object classes (nparray).
         target_cls:  True object classes (nparray).
         plot:  Plot precision-recall curve at mAP@0.5
