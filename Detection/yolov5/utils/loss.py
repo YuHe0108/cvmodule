@@ -127,6 +127,12 @@ class ComputeLoss:
             setattr(self, k, getattr(det, k))
 
     def __call__(self, p, targets):  # predictions, targets, model
+        """
+        最终经过此激活函数，
+        模型的输出的宽高信息与特征图的宽高匹配，因此与原图匹配，需要在乘当前特征图的缩放倍数
+        预测的中心是 0~1之间的数, 需要在加上当前坐标位置， 如预测值为 (0.2, 0.3), 当前位置为 wh_idx =  (10, 12)
+        那么最终目标的中心点在 ：(10 + 0.2, 12 + 0.3)
+        """
         device = targets.device
         lcls, lbox, lobj = torch.zeros(1, device=device), torch.zeros(1, device=device), torch.zeros(1, device=device)
         tcls, tbox, indices, anchors = self.build_targets(p, targets)  # targets
@@ -134,12 +140,12 @@ class ComputeLoss:
         从build_targets函数中构建目标标签，获取标签中的tcls, tbox, indices, anchors
             tcls = [[cls1,cls2,...],[cls1,cls2,...],[cls1,cls2,...]] 每个anchor对应的类别
             tcls.shape = [nl, N]
-            tbox = [[[gx1,gy1,gw1,gh1],[gx2,gy2,gw2,gh2],...], # 中心点的偏移量、宽高
+            tbox = [[[gx1,gy1,gw1,gh1],[gx2,gy2,gw2,gh2],...], # 中心点的偏移量 0 ~ 1 之间、宽高没有缩放
     
             indices = [[image indices1,anchor indices1, gridj1, gridi1],
                        [image indices2,anchor indices2, gridj2, gridi2],
                        ...]] # anchor所属batch图像idx、用到了哪个anchor、中心点坐标距左上角的距离
-            anchors = [[aw1,ah1],[aw2,ah2],...]		  
+            anchors = [[aw1,ah1],[aw2,ah2],...] # anchor宽高的比值		  
         '''
 
         # Losses
@@ -166,22 +172,22 @@ class ComputeLoss:
             if n:
                 '''
                 ps为batch中第b个图像第a个anchor的第gj行第gi列的output
-                ps.shape = [N,5+nc], N = a[0].shape，即符合anchor大小的所有标签数
+                ps.shape = [N,5+nc], N = a[0].shape，即符合 anchor 大小的所有标签数
+                ps: 与 gt 的边框相似的 anchor 在预测特征图中的位置
                 '''
                 ps = pi[b, a, gj, gi]  # prediction subset corresponding to targets
 
                 ''' # Regression
-                xy的预测范围为-0.5~1.5
-                wh的预测范围是0~4倍anchor的w和h，
-                原理在代码后讲述。
+                xy 的预测范围为-0.5~1.5
+                wh 的预测范围是 0~4 倍anchor的w和h，
                 '''
                 pxy = ps[:, :2].sigmoid() * 2 - 0.5
-                pwh = (ps[:, 2:4].sigmoid() * 2) ** 2 * anchors[i]
+                pwh = (ps[:, 2:4].sigmoid() * 2) ** 2 * anchors[i]  # 宽高与 anchor 相乘
                 pbox = torch.cat((pxy, pwh), 1)  # predicted box
                 iou = bbox_iou(pbox.T, tbox[i], x1y1x2y2=False, CIoU=True)  # iou(prediction, target)
                 lbox += (1.0 - iou).mean()  # iou loss
 
-                # 通过gr用来设置IoU的值在object-ness loss中做标签的比重, Object-ness
+                # 置信度损失：通过 gr 用来设置IoU的值在 object-ness loss中做标签的比重, Object-ness
                 score_iou = iou.detach().clamp(0).type(tobj.dtype)
                 if self.sort_obj_iou:
                     sort_id = torch.argsort(score_iou)
@@ -208,7 +214,7 @@ class ComputeLoss:
             self.balance[i]为第i层输出层所占的权重
             将每层的损失乘上权重计算得到obj损失
             '''
-            obji = self.BCEobj(pi[..., 4], tobj)
+            obji = self.BCEobj(pi[..., 4], tobj)  # 计算置信度损失，目标中心点的地方为 iou值，其他地方为 0
             lobj += obji * self.balance[i]  # obj loss
             if self.autobalance:
                 self.balance[i] = self.balance[i] * 0.9999 + 0.0001 / obji.detach().item()
@@ -224,8 +230,13 @@ class ComputeLoss:
     def build_targets(self, p, targets):
         tcls, tbox, indices, anch = [], [], [], []
         ''' 
-        Build targets for compute_loss(), input targets(image_idx, class, x, y, w, h)
+        Build targets for compute_loss(), 
+            targets:  (image_idx, class, x, y, w, h)
+            p:         列表，列表的长度为3, (bs, 3, 80, 80, 6)|(bs, 3, 40, 40, 6)|(bs, 3, 20, 20, 6)
+        此处对于 p 预测值，只用到了特征图的尺寸  
         na = 3, 表示每个预测层anchors的个数, nt为一个batch中所有标签的数量
+        
+        目的：只是搜素出哪些 anchor 是与 真值标签是 相似度最高的，
         '''
         na, nt = self.na, targets.shape[0]  # number of anchors, targets
         '''
@@ -363,7 +374,7 @@ class ComputeLoss:
                 offsets = 0
 
             # Define
-            b, c = t[:, :2].long().T  # image, class
+            b, c = t[:, :2].long().T  # image_idx, class_label_idx
             gxy = t[:, 2:4]  # grid xy
             gwh = t[:, 4:6]  # grid wh
             gij = (gxy - offsets).long()  # 将所有 targets 中心点坐标进行偏移, 并取整
@@ -375,14 +386,14 @@ class ComputeLoss:
             b: 标签所属image的索引 shape = [NOff]
             gj.clamp_(0, gain[3] - 1)将标签所在grid的y限定在0到ny-1之间
             gi.clamp_(0, gain[2] - 1)将标签所在grid的x限定在0到nx-1之间
-            indices = [image, anchor, gridy, gridx] 最终shape = [nl, 4, NOff]
-            tbox：存放的是 <中心点标签> 在所在grid内的相对坐标，∈[0,1] 最终shape = [nl, NOff]
+            indices = [image, anchor, gridy, gridx] 最终shape = [nl, 4, NOff] 作用：哪张图用了哪个anchor，以及anchor在图中的位置
+            tbox：存放的是 <中心点标签> 在所在grid内的相对坐标，∈[0,1] 最终shape = [nl, NOff] 和 宽高信息与对应特征图尺寸对应
             anch：存放的是anchors 最终shape = [nl,NOff,2]
             tcls：存放的是标签的分类 最终shape = [nl,NOff]
             '''
             a = t[:, 6].long()  # 每个 anchor 归属于哪个候选框(三个不同尺寸的候选框): anchor indices
             indices.append((b, a, gj.clamp_(0, gain[3] - 1), gi.clamp_(0, gain[2] - 1)))  # image, anchor, grid indices
-            tbox.append(torch.cat((gxy - gij, gwh), 1))  # box
+            tbox.append(torch.cat((gxy - gij, gwh), 1))  # 真实标签的中心位置以及宽高 - box
             anch.append(anchors[a])  # 用到了哪些anchors
             tcls.append(c)  # class
         return tcls, tbox, indices, anch

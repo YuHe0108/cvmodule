@@ -796,7 +796,12 @@ def non_max_suppression(prediction,
 
 
 def strip_optimizer(f='best.pt', s=''):  # from utils.general import *; strip_optimizer()
-    # Strip optimizer from 'f' to finalize training, optionally save as 's'
+    """
+    在模型训练结束后，即 epoch 达到指定值
+    将 保存模型的文件进行替换和清空
+    模型保存为 16 位，并且删除优化器、更新次数等参数，指保留模型，且保存的模型时EMA模型
+    Strip optimizer from 'f' to finalize training, optionally save as 's'
+    """
     x = torch.load(f, map_location=torch.device('cpu'))
     if x.get('ema'):
         x['model'] = x['ema']  # replace model with ema
