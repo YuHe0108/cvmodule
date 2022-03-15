@@ -5,17 +5,18 @@ YOLO-specific modules
 Usage:
     $ python path/to/models/yolo.py --cfg yolov5s.yaml
 """
-
-import argparse
 import sys
-from copy import deepcopy
+import argparse
+import numpy as np
 from pathlib import Path
+from copy import deepcopy
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[1]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 # ROOT = ROOT.relative_to(Path.cwd())  # relative
+
 
 from models.common import *
 from models.experimental import *
@@ -83,6 +84,9 @@ class Detect(nn.Module):
 
 class Model(nn.Module):
     def __init__(self, cfg='yolov5s.yaml', ch=3, nc=None, anchors=None):  # model, input channels, number of classes
+        """
+        anchors: 可以通过聚类的方式传入 anchor 的尺寸
+        """
         super().__init__()
         if isinstance(cfg, dict):
             self.yaml = cfg  # model dict
@@ -97,13 +101,18 @@ class Model(nn.Module):
         if nc and nc != self.yaml['nc']:
             LOGGER.info(f"Overriding model.yaml nc={self.yaml['nc']} with nc={nc}")
             self.yaml['nc'] = nc  # override yaml value
-        if anchors:
+        if anchors is not None:
             LOGGER.info(f'Overriding model.yaml anchors with anchors={anchors}')
-            self.yaml['anchors'] = round(anchors)  # override yaml value
+            self.yaml['anchors'] = np.round(anchors).tolist()  # override yaml value
+
         self.model, self.save = parse_model(deepcopy(self.yaml), ch=[ch])  # model, savelist
         self.names = [str(i) for i in range(self.yaml['nc'])]  # default names
         self.inplace = self.yaml.get('inplace', True)
 
+        '''
+        在此处，之前聚类得到的anchor尺寸与特征图下采样的倍数相处，得到在当前特诊图尺寸下，anchor的尺寸
+        但是，此时的anchor尺寸是在model的配置文件中提前配置好
+        '''
         # Build strides, anchors
         m = self.model[-1]  # Detect()
         if isinstance(m, Detect):

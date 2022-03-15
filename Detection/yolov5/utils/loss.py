@@ -123,7 +123,7 @@ class ComputeLoss:
             train.py源码中model.gr=1，也就是说完全使用标签框与预测框的CIoU值来作为该预测框的 object-ness 标签。
         '''
         self.BCEcls, self.BCEobj, self.gr, self.hyp, self.autobalance = BCEcls, BCEobj, 1.0, h, autobalance
-        for k in 'na', 'nc', 'nl', 'anchors':
+        for k in 'na', 'nc', 'nl', 'anchors':  # 设置 anchor 信息，信息来源：det, de_parallel
             setattr(self, k, getattr(det, k))
 
     def __call__(self, p, targets):  # predictions, targets, model

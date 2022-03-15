@@ -27,8 +27,7 @@ from torch.utils.data import DataLoader, Dataset, dataloader, distributed
 
 from Detection.yolov5.utils.augmentations import (Albumentations, augment_hsv, copy_paste,
                                                   letterbox, mixup, random_perspective)
-from Detection.yolov5.utils.general import (DATASETS_DIR, LOGGER, NUM_THREADS, check_dataset,
-                                            check_requirements, check_yaml, clean_str,
+from Detection.yolov5.utils.general import (DATASETS_DIR, LOGGER, NUM_THREADS, check_dataset, check_yaml, clean_str,
                                             segments2boxes, xyn2xy, xywh2xyxy, xywhn2xyxy, xyxy2xywhn)
 from Detection.yolov5.utils.torch_utils import torch_distributed_zero_first
 
@@ -62,7 +61,6 @@ def exif_size(img):
             s = (s[1], s[0])
     except Exception:
         pass
-
     return s
 
 
@@ -302,7 +300,6 @@ class LoadStreams:
             # Start thread to read frames from video stream
             st = f'{i + 1}/{n}: {s}... '
             if 'youtube.com/' in s or 'youtu.be/' in s:  # if source is YouTube video
-                check_requirements(('pafy', 'youtube_dl==2020.12.2'))
                 import pafy
                 s = pafy.new(s).getbest(preftype="mp4").url  # YouTube URL
             s = eval(s) if s.isnumeric() else s  # i.e. s = '0' local webcam
@@ -810,7 +807,7 @@ class LoadImagesAndLabels(Dataset):
         return torch.stack(im4, 0), torch.cat(label4, 0), path4, shapes4
 
 
-# Ancillary functions --------------------------------------------------------------------------------------------------
+# Ancillary functions
 def create_folder(path='./new'):
     # Create folder
     if os.path.exists(path):

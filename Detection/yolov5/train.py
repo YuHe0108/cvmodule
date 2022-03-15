@@ -28,12 +28,12 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 import val  # for end-of-epoch mAP
 from models.yolo import Model
 from models.experimental import attempt_load
-from utils.autoanchor import check_anchors
+from utils.autoanchor import check_anchors, kmean_anchors
 from utils.autobatch import check_train_batch_size
 from utils.callbacks import Callbacks
 from utils.datasets import create_dataloader
 from utils.downloads import attempt_download
-from utils.general import (LOGGER, check_dataset, check_file, check_git_status, check_img_size, check_requirements,
+from utils.general import (LOGGER, check_dataset, check_file, check_git_status, check_img_size,
                            check_suffix, check_yaml, colorstr, get_latest_run, increment_path, init_seeds,
                            intersect_dicts, labels_to_class_weights, labels_to_image_weights, methods, one_cycle,
                            print_args, print_mutation, strip_optimizer)
@@ -105,6 +105,11 @@ def train(hyp, opt, device, callbacks):
     # 模型的加载-Model
     check_suffix(weights, '.pt')  # check weights
     pretrained = weights.endswith('.pt')  # 模型的权重等信息
+
+    # 根据数据集聚类anchor
+    anchors = kmean_anchors(opt.data, img_size=opt.imgsz, verbose=False).reshape(3, -1).tolist()
+    hyp['anchors'] = anchors
+    # 输入图像的尺寸 - Image size
     if pretrained:
         with torch_distributed_zero_first(LOCAL_RANK):
             weights = attempt_download(weights)  # download if not found locally
@@ -125,8 +130,6 @@ def train(hyp, opt, device, callbacks):
                 v.requires_grad = False
     else:
         model = Model(cfg, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # 创建模型并初始化-create
-
-    # 输入图像的尺寸 - Image size
     gs = max(int(model.stride.max()), 32)  # grid size (max stride)
     imgsz = check_img_size(opt.imgsz, gs, floor=gs * 2)  # verify imgsz is gs-multiple
 
@@ -448,7 +451,7 @@ def parse_opt(known=False):
     parser.add_argument('--data', type=str, help='dataset.yaml path',
                         default=os.path.join(ROOT, 'data', 'elephant.yaml'))  # 数据集的yaml文件
     parser.add_argument('--hyp', type=str, default=os.path.join(ROOT, 'data', 'hyps', 'hyp.scratch-low.yaml'),
-                        help='hyperparameters path')  # 模型超参数的配置
+                        help='hyper-parameters path')  # 模型超参数的配置
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--batch-size', type=int, default=16, help='total batch size for all GPUs, -1 for autobatch')
     parser.add_argument('--imgsz', '--img', '--img-size', type=int, default=640, help='train, val image size (pixels)')
@@ -476,7 +479,7 @@ def parse_opt(known=False):
     parser.add_argument('--cos-lr', action='store_true', help='cosine LR scheduler')
     parser.add_argument('--label-smoothing', type=float, default=0.0, help='Label smoothing epsilon')
     parser.add_argument('--patience', type=int, default=100, help='EarlyStopping patience (epochs without improvement)')
-    parser.add_argument('--freeze', nargs='+', type=int, default=[2], help='Freeze layers: backbone=10, first3=0 1 2')
+    parser.add_argument('--freeze', nargs='+', type=int, default=[0], help='Freeze layers: backbone=10, first3=0 1 2')
     parser.add_argument('--save-period', type=int, default=-1, help='Save checkpoint every x epochs (disabled if < 1)')
     parser.add_argument('--local_rank', type=int, default=-1, help='DDP parameter, do not modify')
 
@@ -495,7 +498,6 @@ def main(opt, callbacks=Callbacks()):
     if RANK in [-1, 0]:
         print_args(FILE.stem, opt)
         check_git_status()
-        check_requirements(exclude=['thop'])
 
     # Resume
     if opt.resume and not check_wandb_resume(opt) and not opt.evolve:  # resume an interrupted run
@@ -570,7 +572,7 @@ def main(opt, callbacks=Callbacks()):
 
         with open(opt.hyp, errors='ignore') as f:
             hyp = yaml.safe_load(f)  # load hyps dict
-            if 'anchors' not in hyp:  # anchors commented in hyp.yaml
+            if 'anchors' not in hyp:  # 每层像素配置多少个anchor，anchors commented in hyp.yaml
                 hyp['anchors'] = 3
         opt.noval, opt.nosave, save_dir = True, True, Path(opt.save_dir)  # only val/save final epoch
         # ei = [isinstance(x, (int, float)) for x in hyp.values()]  # evolvable indices
