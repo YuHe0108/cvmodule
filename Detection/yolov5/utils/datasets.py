@@ -36,7 +36,7 @@ HELP_URL = 'https://github.com/ultralytics/yolov5/wiki/Train-Custom-Data'
 IMG_FORMATS = 'bmp', 'dng', 'jpeg', 'jpg', 'mpo', 'png', 'tif', 'tiff', 'webp'  # include image suffixes
 VID_FORMATS = 'asf', 'avi', 'gif', 'm4v', 'mkv', 'mov', 'mp4', 'mpeg', 'mpg', 'ts', 'wmv'  # include video suffixes
 
-# Get orientation exif tag
+# 可以从 exif 信息中读取图像是否发生了旋转。Get orientation exif tag
 for orientation in ExifTags.TAGS.keys():
     if ExifTags.TAGS[orientation] == 'Orientation':
         break
@@ -51,7 +51,7 @@ def get_hash(paths):
 
 
 def exif_size(img):
-    # Returns exif-corrected PIL size
+    # 返回图像的尺寸，Returns exif-corrected PIL size
     s = img.size  # (width, height)
     try:
         rotation = dict(img._getexif().items())[orientation]
@@ -92,13 +92,27 @@ def exif_transpose(image):
 
 def create_dataloader(path, imgsz, batch_size, stride, single_cls=False, hyp=None, augment=False, cache=False, pad=0.0,
                       rect=False, rank=-1, workers=8, image_weights=False, quad=False, prefix='', shuffle=False):
+    """
+    path:           txt 文件，每一行表示一张训练图像的绝对路径
+    imgsz:          读取图像时的尺寸
+    stride:         模型最大的缩放倍数
+    hyp:            模型训练时的相关擦书
+    single_cls:     是否为单分类
+    rect:
+    rank:
+    quad:
+    prefix:
+    """
     if rect and shuffle:
         LOGGER.warning('WARNING: --rect is incompatible with DataLoader shuffle, setting shuffle=False')
         shuffle = False
+    '''
+    torch_distributed_zero_first: 用来处理模型进行分布式训练时的同步问题
+    '''
     with torch_distributed_zero_first(rank):  # init dataset *.cache only once if DDP
         dataset = LoadImagesAndLabels(path, imgsz, batch_size,
                                       augment=augment,  # augmentation
-                                      hyp=hyp,  # hyperparameters
+                                      hyp=hyp,  # hyper-parameters
                                       rect=rect,  # rectangular batches
                                       cache_images=cache,
                                       single_cls=single_cls,
@@ -385,13 +399,13 @@ class LoadImagesAndLabels(Dataset):
         self.image_weights = image_weights
         self.rect = False if image_weights else rect
         self.mosaic = self.augment and not self.rect  # load 4 images at a time into a mosaic (only during training)
-        self.mosaic_border = [-img_size // 2, -img_size // 2]
+        self.mosaic_border = [-img_size // 2, -img_size // 2]  # mosaic 增强时填充边界
         self.stride = stride
         self.path = path
         self.albumentations = Albumentations() if augment else None
 
         try:
-            f = []  # image files
+            f = []  # 读取训练图像路径  image files
             for p in path if isinstance(path, list) else [path]:
                 p = Path(p)  # os-agnostic
                 if p.is_dir():  # dir
@@ -412,14 +426,14 @@ class LoadImagesAndLabels(Dataset):
             raise Exception(f'{prefix}Error loading data from {path}: {e}\nSee {HELP_URL}')
 
         # Check cache
-        self.label_files = img2label_paths(self.im_files)  # labels
+        self.label_files = img2label_paths(self.im_files)  # 找到图像对应的标签 labels
         cache_path = (p if p.is_file() else Path(self.label_files[0]).parent).with_suffix('.cache')
         try:
             cache, exists = np.load(cache_path, allow_pickle=True).item(), True  # load dict
             assert cache['version'] == self.cache_version  # same version
             assert cache['hash'] == get_hash(self.label_files + self.im_files)  # same hash
         except Exception:
-            cache, exists = self.cache_labels(cache_path, prefix), False  # cache
+            cache, exists = self.cache_labels(cache_path, prefix), False  # 将图像以及标签信息缓存到本地 cache
 
         # Display cache
         nf, nm, ne, nc, n = cache.pop('results')  # found, missing, empty, corrupt, total
@@ -435,12 +449,12 @@ class LoadImagesAndLabels(Dataset):
         labels, shapes, self.segments = zip(*cache.values())
         self.labels = list(labels)
         self.shapes = np.array(shapes, dtype=np.float64)
-        self.im_files = list(cache.keys())  # update
-        self.label_files = img2label_paths(cache.keys())  # update
+        self.im_files = list(cache.keys())  # 图像的路径 update
+        self.label_files = img2label_paths(cache.keys())  # 标签的路径 update
         n = len(shapes)  # number of images
         bi = np.floor(np.arange(n) / batch_size).astype(np.int)  # batch index
-        nb = bi[-1] + 1  # number of batches
-        self.batch = bi  # batch index of image
+        nb = bi[-1] + 1  # 当前训练集一共可以训练多少个 batch number of batches
+        self.batch = bi  # 每张图像的 batch_idx, batch index of image
         self.n = n
         self.indices = range(n)
 
@@ -462,27 +476,27 @@ class LoadImagesAndLabels(Dataset):
         if self.rect:
             # Sort by aspect ratio
             s = self.shapes  # wh
-            ar = s[:, 1] / s[:, 0]  # aspect ratio
+            ar = s[:, 1] / s[:, 0]  # 宽高的比值 aspect ratio
             irect = ar.argsort()
-            self.im_files = [self.im_files[i] for i in irect]
+            self.im_files = [self.im_files[i] for i in irect]  # 根据 height / width 的比值从小到大读取信息
             self.label_files = [self.label_files[i] for i in irect]
             self.labels = [self.labels[i] for i in irect]
             self.shapes = s[irect]  # wh
             ar = ar[irect]
 
             # Set training image shapes
-            shapes = [[1, 1]] * nb
+            shapes = [[1, 1]] * nb  # nb: num batches, 记录下当前训练批次下，宽高比值的最大和最小值
             for i in range(nb):
-                ari = ar[bi == i]
+                ari = ar[bi == i]  # 找到同一个训练批次的图像
                 mini, maxi = ari.min(), ari.max()
                 if maxi < 1:
                     shapes[i] = [maxi, 1]
                 elif mini > 1:
                     shapes[i] = [1, 1 / mini]
 
-            self.batch_shapes = np.ceil(np.array(shapes) * img_size / stride + pad).astype(np.int) * stride
+            self.batch_shapes = np.ceil(np.array(shapes) * img_size / stride + pad).astype(np.int) * stride # 不同批次的训练图像，pad尺寸不同
 
-        # Cache images into RAM/disk for faster training (WARNING: large datasets may exceed system resources)
+        # 将训练集图像保存到本地npy文件中。Cache images into RAM/disk for faster training (WARNING: large datasets may exceed system resources)
         self.ims = [None] * n
         self.npy_files = [Path(f).with_suffix('.npy') for f in self.im_files]
         if cache_images:
@@ -1033,3 +1047,8 @@ def dataset_stats(path='coco128.yaml', autodownload=False, verbose=False, profil
     if verbose:
         print(json.dumps(stats, indent=2, sort_keys=False))
     return stats
+
+
+if __name__ == '__main__':
+    res_ = get_hash(r'D:\LasoFiles\test_git\cvmodule\Detection\yolov5\train.py')
+    print(res_)

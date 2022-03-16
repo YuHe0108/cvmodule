@@ -4,14 +4,12 @@ Logging utils
 """
 
 import os
+import torch
 import warnings
 from threading import Thread
-
 import pkg_resources as pkg
-import torch
 from torch.utils.tensorboard import SummaryWriter
 
-from utils.general import colorstr, emojis
 from utils.loggers.wandb.wandb_utils import WandbLogger
 from utils.plots import plot_images, plot_results
 from utils.torch_utils import de_parallel
@@ -34,7 +32,7 @@ except (ImportError, AssertionError):
     wandb = None
 
 
-class Loggers():
+class Loggers:
     # YOLOv5 Loggers class
     def __init__(self, save_dir=None, weights=None, opt=None, hyp=None, logger=None, include=LOGGERS):
         self.save_dir = save_dir
@@ -47,29 +45,30 @@ class Loggers():
                      'metrics/precision', 'metrics/recall', 'metrics/mAP_0.5', 'metrics/mAP_0.5:0.95',  # metrics
                      'val/box_loss', 'val/obj_loss', 'val/cls_loss',  # val loss
                      'x/lr0', 'x/lr1', 'x/lr2']  # params
-        self.best_keys = ['best/epoch', 'best/precision', 'best/recall', 'best/mAP_0.5', 'best/mAP_0.5:0.95',]
+        self.best_keys = ['best/epoch', 'best/precision', 'best/recall', 'best/mAP_0.5', 'best/mAP_0.5:0.95', ]
         for k in LOGGERS:
             setattr(self, k, None)  # init empty logger dictionary
         self.csv = True  # always log to csv
 
         # Message
         if not wandb:
-            prefix = colorstr('Weights & Biases: ')
-            s = f"{prefix}run 'pip install wandb' to automatically track and visualize YOLOv5 🚀 runs (RECOMMENDED)"
-            print(emojis(s))
+            prefix = 'Weights & Biases: '
+            info = f"{prefix} run 'pip install wandb' to automatically track and visualize YOLOv5 runs (RECOMMENDED)"
+            print(info)
 
         # TensorBoard
         s = self.save_dir
         if 'tb' in self.include and not self.opt.evolve:
-            prefix = colorstr('TensorBoard: ')
-            self.logger.info(f"{prefix}Start with 'tensorboard --logdir {s.parent}', view at http://localhost:6006/")
+            prefix = 'TensorBoard: '
+            info = f"{prefix}Start with 'tensorboard --logdir {s.parent}', view at http://localhost:6006/"
+            print(info)
             self.tb = SummaryWriter(str(s))
 
         # W&B
         if wandb and 'wandb' in self.include:
             wandb_artifact_resume = isinstance(self.opt.resume, str) and self.opt.resume.startswith('wandb-artifact://')
             run_id = torch.load(self.weights).get('wandb_id') if self.opt.resume and not wandb_artifact_resume else None
-            self.opt.hyp = self.hyp  # add hyperparameters
+            self.opt.hyp = self.hyp  # add hyper-parameters
             self.wandb = WandbLogger(self.opt, run_id)
         else:
             self.wandb = None

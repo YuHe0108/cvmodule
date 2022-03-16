@@ -32,11 +32,10 @@ from utils.autoanchor import check_anchors, kmean_anchors
 from utils.autobatch import check_train_batch_size
 from utils.callbacks import Callbacks
 from utils.datasets import create_dataloader
-from utils.downloads import attempt_download
-from utils.general import (LOGGER, check_dataset, check_file, check_git_status, check_img_size,
-                           check_suffix, check_yaml, colorstr, get_latest_run, increment_path, init_seeds,
+from utils.general import (LOGGER, check_dataset, check_file, check_img_size, check_suffix, check_yaml,
+                           get_latest_run, increment_path, init_seeds,
                            intersect_dicts, labels_to_class_weights, labels_to_image_weights, methods, one_cycle,
-                           print_args, print_mutation, strip_optimizer)
+                           print_mutation, strip_optimizer)
 from utils.loggers import Loggers
 from utils.loggers.wandb.wandb_utils import check_wandb_resume
 from utils.loss import ComputeLoss
@@ -62,11 +61,11 @@ def train(hyp, opt, device, callbacks):
     (w.parent if evolve else w).mkdir(parents=True, exist_ok=True)  # make dir
     last, best = w / 'last.pt', w / 'best.pt'  # 保存模型的权重，一个最新、一个最好
 
-    # 从yaml文件中加载, 模型的超参数- Hyper-parameters
+    # 从yaml文件中加载, 训练模型的超参数- Hyper-parameters
     if isinstance(hyp, str):
         with open(hyp, errors='ignore') as f:
             hyp = yaml.safe_load(f)  # load hyps dict
-    LOGGER.info(colorstr('hyper-parameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
+    print('hyper-parameters: ', ','.join(f'{k}={v}' for k, v in hyp.items()))
 
     # 将训练时的超参数、配置重新保存, Save run settings
     if not evolve:
@@ -111,22 +110,20 @@ def train(hyp, opt, device, callbacks):
     hyp['anchors'] = anchors
     # 输入图像的尺寸 - Image size
     if pretrained:
-        with torch_distributed_zero_first(LOCAL_RANK):
-            weights = attempt_download(weights)  # download if not found locally
         ckpt = torch.load(weights, map_location='cpu')  # load checkpoint to CPU to avoid CUDA memory leak
         model = Model(cfg or ckpt['model'].yaml, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
         exclude = ['anchor'] if (cfg or hyp.get('anchors')) and not resume else []  # exclude keys
         csd = ckpt['model'].float().state_dict()  # checkpoint state_dict as FP32
         csd = intersect_dicts(csd, model.state_dict(), exclude=exclude)  # intersect
         model.load_state_dict(csd, strict=False)  # load
-        LOGGER.info(f'Transferred {len(csd)}/{len(model.state_dict())} items from {weights}')  # report
+        print(f'Transferred {len(csd)}/{len(model.state_dict())} items from {weights}')  # report
 
         # 只有加在权重的时候，才可以冻结模型的某些权重 - Freeze
         freeze = [f'model.{x}.' for x in (freeze if len(freeze) > 1 else range(freeze[0]))]  # layers to freeze
         for k, v in model.named_parameters():
             v.requires_grad = True  # train all layers
             if any(x in k for x in freeze):
-                LOGGER.info(f'freezing {k}')
+                print(f'freezing {k}')
                 v.requires_grad = False
     else:
         model = Model(cfg, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # 创建模型并初始化-create
@@ -142,7 +139,7 @@ def train(hyp, opt, device, callbacks):
     nbs = 64  # nominal batch size
     accumulate = max(round(nbs / batch_size), 1)  # accumulate loss before optimizing
     hyp['weight_decay'] *= batch_size * accumulate / nbs  # scale weight_decay
-    LOGGER.info(f"Scaled weight_decay = {hyp['weight_decay']}")
+    print(f"Scaled weight_decay = {hyp['weight_decay']}")
 
     # 将不同的权重使用不同的优化策略
     g0, g1, g2 = [], [], []  # g0: BN权重, g1: conv权重, g2: 偏置 optimizer parameter groups
@@ -163,8 +160,8 @@ def train(hyp, opt, device, callbacks):
     # 添加其余权重信息，并施加衰减系数
     optimizer.add_param_group({'params': g1, 'weight_decay': hyp['weight_decay']})  # add g1 with weight_decay
     optimizer.add_param_group({'params': g2})  # add g2 (biases)
-    LOGGER.info(f"{colorstr('optimizer:')} {type(optimizer).__name__} with parameter groups "
-                f"{len(g0)} weight (no decay), {len(g1)} weight, {len(g2)} bias")
+    print(f"optimizer: {type(optimizer).__name__} with parameter groups "
+          f"{len(g0)} weight (no decay), {len(g1)} weight, {len(g2)} bias")
     del g0, g1, g2
 
     # 优化器学习的更新策略：Scheduler
@@ -194,7 +191,7 @@ def train(hyp, opt, device, callbacks):
         if resume:
             assert start_epoch > 0, f'{weights} training to {epochs} epochs is finished, nothing to resume.'
         if epochs < start_epoch:
-            LOGGER.info(f"{weights} has been trained for {ckpt['epoch']} epochs. Fine-tuning for {epochs} more epochs.")
+            print(f"{weights} has been trained for {ckpt['epoch']} epochs. Fine-tuning for {epochs} more epochs.")
             epochs += ckpt['epoch']  # finetune additional epochs
         del ckpt, csd
 
@@ -206,14 +203,14 @@ def train(hyp, opt, device, callbacks):
     # SyncBatchNorm
     if opt.sync_bn and cuda and RANK != -1:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(device)
-        LOGGER.info('Using SyncBatchNorm()')
+        print('Using SyncBatchNorm()')
 
     # 加载训练数据集， TrainLoader
     train_loader, dataset = create_dataloader(train_path, imgsz, batch_size // WORLD_SIZE, gs, single_cls,
                                               hyp=hyp, augment=True, cache=None if opt.cache == 'val' else opt.cache,
                                               rect=opt.rect, rank=LOCAL_RANK, workers=workers,
                                               image_weights=opt.image_weights, quad=opt.quad,
-                                              prefix=colorstr('train: '), shuffle=True)
+                                              prefix='train: ', shuffle=True)
 
     mlc = int(np.concatenate(dataset.labels, 0)[:, 0].max())  # max label class
     nb = len(train_loader)  # 一个epoch共有多少个batch: number of batches
@@ -224,7 +221,7 @@ def train(hyp, opt, device, callbacks):
         val_loader = create_dataloader(val_path, imgsz, batch_size // WORLD_SIZE * 2, gs, single_cls,
                                        hyp=hyp, cache=None if noval else opt.cache,
                                        rect=True, rank=-1, workers=workers * 2, pad=0.5,
-                                       prefix=colorstr('val: '))[0]
+                                       prefix='val: ')[0]
 
         if not resume:
             labels = np.concatenate(dataset.labels, 0)
@@ -264,12 +261,14 @@ def train(hyp, opt, device, callbacks):
     scaler = amp.GradScaler(enabled=cuda)
     stopper = EarlyStopping(patience=opt.patience)
     compute_loss = ComputeLoss(model)  # init loss class
-    LOGGER.info(f'Image sizes {imgsz} train, {imgsz} val\n'
-                f'Using {train_loader.num_workers * WORLD_SIZE} dataloader workers\n'
-                f"Logging results to {colorstr('bold', save_dir)}\n"
-                f'Starting training for {epochs} epochs...')
+    print(f'Image sizes {imgsz} train, {imgsz} val\n'
+          f'Using {train_loader.num_workers * WORLD_SIZE} dataloader workers\n'
+          f"Logging results to {'bold', save_dir}\n"
+          f'Starting training for {epochs} epochs...')
 
-    for epoch in range(start_epoch, epochs):  # ------- epoch -----------
+    # ------- training epoch start -----------
+    epoch = start_epoch
+    for epoch in range(start_epoch, epochs):
         model.train()
         # Update image weights (optional, single-GPU only)
         if opt.image_weights:
@@ -284,14 +283,14 @@ def train(hyp, opt, device, callbacks):
         if RANK != -1:
             train_loader.sampler.set_epoch(epoch)
         pbar = enumerate(train_loader)
-        LOGGER.info(('\n' + '%10s' * 7) % ('Epoch', 'gpu_mem', 'box', 'obj', 'cls', 'labels', 'img_size'))
+        print(('\n' + '%10s' * 7) % ('Epoch', 'gpu_mem', 'box', 'obj', 'cls', 'labels', 'img_size'))
         if RANK in [-1, 0]:
             pbar = tqdm(pbar, total=nb, bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}')  # progress bar
         optimizer.zero_grad()
 
         for i, (imgs, targets, paths, _) in pbar:  # batch
             # targets.shape = (num_obj, 6),
-            # 第一维度表示当前目标归属于当前batch的哪一张图
+            # 第一维度表示当前目标信息归属于当前batch的哪一张图
             # 第二维：表示当前目标的类别
             # 3 ~ 6: 边框的宽高和中心点坐标
             ni = i + nb * epoch  # 已经训练了多少batch: number integrated batches (since train start)
@@ -397,29 +396,28 @@ def train(hyp, opt, device, callbacks):
                 callbacks.run('on_model_save', last, epoch, final_epoch, best_fitness, fi)
 
             # Stop Single-GPU
-            if RANK == -1 and stopper(epoch=epoch, fitness=fi):
+            if RANK == -1 and stopper(epoch=epoch, fitness=fi):  # 如果结果保持不变，可以提前停止训练
                 break
 
             # Stop DDP TODO: known issues shttps://github.com/ultralytics/yolov5/pull/4576
             # stop = stopper(epoch=epoch, fitness=fi)
             # if RANK == 0:
             #    dist.broadcast_object_list([stop], 0)  # broadcast 'stop' to all ranks
-
         # Stop DPP
         # with torch_distributed_zero_first(RANK):
-        # if stop:
-        #    break  # must break all DDP ranks
+        #    if stop:
+        #       break  # must break all DDP ranks
 
-        # end epoch ----------------------------------------------------------------------------------------------------
+        # ---------- end epoch ----------
 
     # 结束训练过程
     if RANK in [-1, 0]:
-        LOGGER.info(f'\n{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.')
+        print(f'\n{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.')
         for f in last, best:
             if f.exists():
                 strip_optimizer(f)  # strip optimizers
                 if f is best:
-                    LOGGER.info(f'\nValidating {f}...')
+                    print(f'\nValidating {f}...')
                     results, _, _ = val.run(data_dict,
                                             batch_size=batch_size // WORLD_SIZE * 2,
                                             imgsz=imgsz,
@@ -437,7 +435,7 @@ def train(hyp, opt, device, callbacks):
                         callbacks.run('on_fit_epoch_end', list(mloss) + list(results) + lr, epoch, best_fitness, fi)
 
         callbacks.run('on_train_end', last, best, plots, epoch, results)
-        LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}")
+        print(f"Results saved to {'bold', save_dir}")
     torch.cuda.empty_cache()
     return results
 
@@ -496,8 +494,7 @@ def parse_opt(known=False):
 def main(opt, callbacks=Callbacks()):
     # Checks
     if RANK in [-1, 0]:
-        print_args(FILE.stem, opt)
-        check_git_status()
+        print(FILE.stem, opt)
 
     # Resume
     if opt.resume and not check_wandb_resume(opt) and not opt.evolve:  # resume an interrupted run
@@ -506,7 +503,7 @@ def main(opt, callbacks=Callbacks()):
         with open(Path(ckpt).parent.parent / 'opt.yaml', errors='ignore') as f:
             opt = argparse.Namespace(**yaml.safe_load(f))  # replace
         opt.cfg, opt.weights, opt.resume = '', ckpt, True  # reinstate
-        LOGGER.info(f'Resuming training from {ckpt}')
+        print(f'Resuming training from {ckpt}')
     else:
         opt.data, opt.cfg, opt.hyp, opt.weights, opt.project = \
             check_file(opt.data), check_yaml(opt.cfg), check_yaml(opt.hyp), str(opt.weights), str(opt.project)  # checks
@@ -534,7 +531,7 @@ def main(opt, callbacks=Callbacks()):
     if not opt.evolve:
         train(opt.hyp, opt, device, callbacks)
         if WORLD_SIZE > 1 and RANK == 0:
-            LOGGER.info('Destroying process group... ')
+            print('Destroying process group... ')
             dist.destroy_process_group()
 
     # Evolve hyper-parameters (optional)
@@ -620,9 +617,9 @@ def main(opt, callbacks=Callbacks()):
 
         # Plot results
         plot_evolve(evolve_csv)
-        LOGGER.info(f'Hyperparameter evolution finished {opt.evolve} generations\n'
-                    f"Results saved to {colorstr('bold', save_dir)}\n"
-                    f'Usage example: $ python train.py --hyp {evolve_yaml}')
+        print(f'Hyperparameter evolution finished {opt.evolve} generations\n'
+              f"Results saved to {'bold', save_dir}\n"
+              f'Usage example: $ python train.py --hyp {evolve_yaml}')
 
 
 def run(**kwargs):

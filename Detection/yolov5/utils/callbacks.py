@@ -1,6 +1,6 @@
 # YOLOv5 🚀 by Ultralytics, GPL-3.0 license
 """
-Callback utils
+回调函数：Callback utils
 """
 
 

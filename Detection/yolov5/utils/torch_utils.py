@@ -10,8 +10,8 @@ from copy import deepcopy
 from contextlib import contextmanager
 
 import torch
-import torch.distributed as dist
 import torch.nn as nn
+import torch.distributed as dist
 import torch.nn.functional as F
 
 from Detection.yolov5.utils.general import LOGGER
@@ -27,9 +27,14 @@ warnings.filterwarnings('ignore', message='User provided device_type of \'cuda\'
 
 @contextmanager
 def torch_distributed_zero_first(local_rank: int):
-    # Decorator to make all processes in distributed training wait for each local_master to do something
-    if local_rank not in [-1, 0]:
-        dist.barrier(device_ids=[local_rank])
+    """
+    用于处理模型进行分布式训练时同步问题
+    基于torch.distributed.barrier()函数的上下文管理器，为了完成数据的正常同步操作（yolov5中拥有大量的多线程并行操作）
+    Decorator to make all processes in distributed training wait for each local_master to do something.
+    params: local_rank: 代表当前进程号  0代表主进程  1、2、3代表子进程
+    """
+    if local_rank not in [-1, 0]:  # 表示执行此程序的不是主进程
+        dist.barrier(device_ids=[local_rank])  # 造成堵塞
     yield
     if local_rank == 0:
         dist.barrier(device_ids=[0])
@@ -62,7 +67,7 @@ def device_count():
 
 def select_device(device='', batch_size=0, newline=True):
     # device = 'cpu' or '0' or '0,1,2,3'
-    s = f'YOLOv5 🚀 {git_describe() or date_modified()} torch {torch.__version__} '  # string
+    s = f'YOLOv5: {date_modified()} torch: {torch.__version__} '  # string
     device = str(device).strip().lower().replace('cuda:', '')  # to string, 'cuda:0' to '0'
     cpu = device == 'cpu'
     if cpu:
@@ -87,7 +92,7 @@ def select_device(device='', batch_size=0, newline=True):
 
     if not newline:
         s = s.rstrip()
-    LOGGER.info(s.encode().decode('ascii', 'ignore') if platform.system() == 'Windows' else s)  # emoji-safe
+    print(s.encode().decode('ascii', 'ignore') if platform.system() == 'Windows' else s)  # emoji-safe
     return torch.device('cuda:0' if cuda else 'cpu')
 
 
@@ -269,6 +274,9 @@ def copy_attr(a, b, include=(), exclude=()):
 class EarlyStopping:
     # YOLOv5 simple early stopper
     def __init__(self, patience=30):
+        """
+        如果训练的 epoch 次数在 patience 以上还是没有出现上涨，则退出训练
+        """
         self.best_fitness = 0.0  # i.e. mAP
         self.best_epoch = 0
         self.patience = patience or float('inf')  # epochs to wait after fitness stops improving to stop
