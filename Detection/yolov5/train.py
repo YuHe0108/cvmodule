@@ -505,6 +505,10 @@ def main(opt, callbacks=Callbacks()):
         opt.cfg, opt.weights, opt.resume = '', ckpt, True  # reinstate
         print(f'Resuming training from {ckpt}')
     else:
+        '''
+        opt.data: 模型训练集的 yaml 文件
+        opt.cfg:  
+        '''
         opt.data, opt.cfg, opt.hyp, opt.weights, opt.project = \
             check_file(opt.data), check_yaml(opt.cfg), check_yaml(opt.hyp), str(opt.weights), str(opt.project)  # checks
         assert len(opt.cfg) or len(opt.weights), 'either --cfg or --weights must be specified'
@@ -533,7 +537,6 @@ def main(opt, callbacks=Callbacks()):
         if WORLD_SIZE > 1 and RANK == 0:
             print('Destroying process group... ')
             dist.destroy_process_group()
-
     # Evolve hyper-parameters (optional)
     else:
         # Hyperparameter evolution metadata (mutation scale 0-1, lower_limit, upper_limit)
@@ -618,8 +621,9 @@ def main(opt, callbacks=Callbacks()):
         # Plot results
         plot_evolve(evolve_csv)
         print(f'Hyperparameter evolution finished {opt.evolve} generations\n'
-              f"Results saved to {'bold', save_dir}\n"
+              f"Results saved to {save_dir}\n"
               f'Usage example: $ python train.py --hyp {evolve_yaml}')
+    return
 
 
 def run(**kwargs):
@@ -634,3 +638,5 @@ def run(**kwargs):
 if __name__ == "__main__":
     opt = parse_opt()
     main(opt)
+
+import cvmodule
