@@ -28,9 +28,16 @@ import pkg_resources as pkg
 import torch
 import torchvision
 import yaml
+import sys
 
-from Detection.yolov5.utils.downloads import gsutil_getsize
-from Detection.yolov5.utils.metrics import box_iou, fitness
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[0]  # YOLOv5 root directory
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))  # add ROOT to PATH
+ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+
+from downloads import gsutil_getsize
+from metrics import box_iou, fitness
 
 # Settings
 FILE = Path(__file__).resolve()

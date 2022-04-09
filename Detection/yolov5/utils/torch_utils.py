@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.distributed as dist
 import torch.nn.functional as F
 
-from Detection.yolov5.utils.general import LOGGER
+from utils.general import LOGGER
 
 try:
     import thop  # for FLOPs computation
