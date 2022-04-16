@@ -25,11 +25,11 @@ import torch.nn.functional as F
 from PIL import ExifTags, Image, ImageOps
 from torch.utils.data import DataLoader, Dataset, dataloader, distributed
 
-from utils.augmentations import (Albumentations, augment_hsv, copy_paste,
+from Detection.yolov5.utils.augmentations import (Albumentations, augment_hsv, copy_paste,
                                                   letterbox, mixup, random_perspective)
-from utils.general import (DATASETS_DIR, LOGGER, NUM_THREADS, check_dataset, check_yaml, clean_str,
+from Detection.yolov5.utils.general import (DATASETS_DIR, LOGGER, NUM_THREADS, check_dataset, check_yaml, clean_str,
                                             segments2boxes, xyn2xy, xywh2xyxy, xywhn2xyxy, xyxy2xywhn)
-from utils.torch_utils import torch_distributed_zero_first
+from Detection.yolov5.utils.torch_utils import torch_distributed_zero_first
 
 # Parameters
 HELP_URL = 'https://github.com/ultralytics/yolov5/wiki/Train-Custom-Data'
@@ -494,7 +494,8 @@ class LoadImagesAndLabels(Dataset):
                 elif mini > 1:
                     shapes[i] = [1, 1 / mini]
 
-            self.batch_shapes = np.ceil(np.array(shapes) * img_size / stride + pad).astype(np.int) * stride # 不同批次的训练图像，pad尺寸不同
+            self.batch_shapes = np.ceil(np.array(shapes) * img_size / stride + pad).astype(
+                np.int) * stride  # 不同批次的训练图像，pad尺寸不同
 
         # 将训练集图像保存到本地npy文件中。Cache images into RAM/disk for faster training (WARNING: large datasets may exceed system resources)
         self.ims = [None] * n

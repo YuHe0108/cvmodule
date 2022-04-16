@@ -28,20 +28,20 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 import val  # for end-of-epoch mAP
 from models.yolo import Model
 from models.experimental import attempt_load
-from utils.autoanchor import check_anchors, kmean_anchors
-from utils.autobatch import check_train_batch_size
-from utils.callbacks import Callbacks
-from utils.datasets import create_dataloader
-from utils.general import (LOGGER, check_dataset, check_file, check_img_size, check_suffix, check_yaml,
+from tools.autoanchor import check_anchors, kmean_anchors
+from tools.autobatch import check_train_batch_size
+from tools.callbacks import Callbacks
+from tools.datasets import create_dataloader
+from tools.general import (LOGGER, check_dataset, check_file, check_img_size, check_suffix, check_yaml,
                            get_latest_run, increment_path, init_seeds,
                            intersect_dicts, labels_to_class_weights, labels_to_image_weights, methods, one_cycle,
                            print_mutation, strip_optimizer)
-from utils.loggers import Loggers
-from utils.loggers.wandb.wandb_utils import check_wandb_resume
-from utils.loss import ComputeLoss
-from utils.metrics import fitness
-from utils.plots import plot_evolve, plot_labels
-from utils.torch_utils import EarlyStopping, ModelEMA, de_parallel, select_device, torch_distributed_zero_first
+from tools.loggers import Loggers
+from tools.loggers.wandb.wandb_utils import check_wandb_resume
+from tools.loss import ComputeLoss
+from tools.metrics import fitness
+from tools.plots import plot_evolve, plot_labels
+from tools.torch_utils import EarlyStopping, ModelEMA, de_parallel, select_device, torch_distributed_zero_first
 
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
 RANK = int(os.getenv('RANK', -1))

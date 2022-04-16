@@ -66,11 +66,11 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 from models.common import Conv
 from models.experimental import attempt_load
 from models.yolo import Detect
-from utils.activations import SiLU
-from utils.datasets import LoadImages
-from utils.general import (LOGGER, check_dataset, check_img_size, check_requirements, check_version, colorstr,
+from tools.activations import SiLU
+from tools.datasets import LoadImages
+from tools.general import (LOGGER, check_dataset, check_img_size, check_requirements, check_version, colorstr,
                            file_size, print_args, url2file)
-from utils.torch_utils import select_device
+from tools.torch_utils import select_device
 
 
 def export_formats():
@@ -245,50 +245,6 @@ def export_engine(model, im, file, train, half, simplify, workspace=4, verbose=F
         LOGGER.info(f'\n{prefix} export failure: {e}')
 
 
-def export_saved_model(model, im, file, dynamic,
-                       tf_nms=False, agnostic_nms=False, topk_per_class=100, topk_all=100, iou_thres=0.45,
-                       conf_thres=0.25, keras=False, prefix=colorstr('TensorFlow SavedModel:')):
-    # YOLOv5 TensorFlow SavedModel export
-    try:
-        import tensorflow as tf
-        from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2
-
-        from models.tf import TFDetect, TFModel
-
-        LOGGER.info(f'\n{prefix} starting export with tensorflow {tf.__version__}...')
-        f = str(file).replace('.pt', '_saved_model')
-        batch_size, ch, *imgsz = list(im.shape)  # BCHW
-
-        tf_model = TFModel(cfg=model.yaml, model=model, nc=model.nc, imgsz=imgsz)
-        im = tf.zeros((batch_size, *imgsz, ch))  # BHWC order for TensorFlow
-        _ = tf_model.predict(im, tf_nms, agnostic_nms, topk_per_class, topk_all, iou_thres, conf_thres)
-        inputs = tf.keras.Input(shape=(*imgsz, ch), batch_size=None if dynamic else batch_size)
-        outputs = tf_model.predict(inputs, tf_nms, agnostic_nms, topk_per_class, topk_all, iou_thres, conf_thres)
-        keras_model = tf.keras.Model(inputs=inputs, outputs=outputs)
-        keras_model.trainable = False
-        keras_model.summary()
-        if keras:
-            keras_model.save(f, save_format='tf')
-        else:
-            m = tf.function(lambda x: keras_model(x))  # full model
-            spec = tf.TensorSpec(keras_model.inputs[0].shape, keras_model.inputs[0].dtype)
-            m = m.get_concrete_function(spec)
-            frozen_func = convert_variables_to_constants_v2(m)
-            tfm = tf.Module()
-            tfm.__call__ = tf.function(lambda x: frozen_func(x), [spec])
-            tfm.__call__(im)
-            tf.saved_model.save(
-                tfm,
-                f,
-                options=tf.saved_model.SaveOptions(experimental_custom_gradients=False) if
-                check_version(tf.__version__, '2.6') else tf.saved_model.SaveOptions())
-        LOGGER.info(f'{prefix} export success, saved as {f} ({file_size(f):.1f} MB)')
-        return keras_model, f
-    except Exception as e:
-        LOGGER.info(f'\n{prefix} export failure: {e}')
-        return None, None
-
-
 def export_pb(keras_model, im, file, prefix=colorstr('TensorFlow GraphDef:')):
     # YOLOv5 TensorFlow GraphDef *.pb export https://github.com/leimao/Frozen_Graph_TensorFlow
     try:
@@ -408,6 +364,50 @@ def export_tfjs(keras_model, im, file, prefix=colorstr('TensorFlow.js:')):
         LOGGER.info(f'\n{prefix} export failure: {e}')
 
 
+def export_saved_model(model, im, file, dynamic,
+                       tf_nms=False, agnostic_nms=False, topk_per_class=100, topk_all=100, iou_thres=0.45,
+                       conf_thres=0.25, keras=False, prefix=colorstr('TensorFlow SavedModel:')):
+    # YOLOv5 TensorFlow SavedModel export
+    try:
+        import tensorflow as tf
+        from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2
+
+        from models.tf import TFDetect, TFModel
+
+        LOGGER.info(f'\n{prefix} starting export with tensorflow {tf.__version__}...')
+        f = str(file).replace('.pt', '_saved_model')
+        batch_size, ch, *imgsz = list(im.shape)  # BCHW
+
+        tf_model = TFModel(cfg=model.yaml, model=model, nc=model.nc, imgsz=imgsz)
+        im = tf.zeros((batch_size, *imgsz, ch))  # BHWC order for TensorFlow
+        _ = tf_model.predict(im, tf_nms, agnostic_nms, topk_per_class, topk_all, iou_thres, conf_thres)
+        inputs = tf.keras.Input(shape=(*imgsz, ch), batch_size=None if dynamic else batch_size)
+        outputs = tf_model.predict(inputs, tf_nms, agnostic_nms, topk_per_class, topk_all, iou_thres, conf_thres)
+        keras_model = tf.keras.Model(inputs=inputs, outputs=outputs)
+        keras_model.trainable = False
+        keras_model.summary()
+        if keras:
+            keras_model.save(f, save_format='tf')
+        else:
+            m = tf.function(lambda x: keras_model(x))  # full model
+            spec = tf.TensorSpec(keras_model.inputs[0].shape, keras_model.inputs[0].dtype)
+            m = m.get_concrete_function(spec)
+            frozen_func = convert_variables_to_constants_v2(m)
+            tfm = tf.Module()
+            tfm.__call__ = tf.function(lambda x: frozen_func(x), [spec])
+            tfm.__call__(im)
+            tf.saved_model.save(
+                tfm,
+                f,
+                options=tf.saved_model.SaveOptions(experimental_custom_gradients=False) if
+                check_version(tf.__version__, '2.6') else tf.saved_model.SaveOptions())
+        LOGGER.info(f'{prefix} export success, saved as {f} ({file_size(f):.1f} MB)')
+        return keras_model, f
+    except Exception as e:
+        LOGGER.info(f'\n{prefix} export failure: {e}')
+        return None, None
+
+
 @torch.no_grad()
 def run(data=ROOT / 'data/coco128.yaml',  # 'dataset.yaml path'
         weights=ROOT / 'yolov5s.pt',  # weights path
@@ -521,18 +521,19 @@ def run(data=ROOT / 'data/coco128.yaml',  # 'dataset.yaml path'
 def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', type=str, default=ROOT / 'data/coco128.yaml', help='dataset.yaml path')
-    parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'yolov5s.pt', help='model.pt path(s)')
+    parser.add_argument('--weights', nargs='+', type=str, help='model.pt path(s)',
+                        default=r'D:\Vortex\Project_2\sdyd_box\data\models\zhxjc\1.0.0\zhxjc_yolov5s_small.pt')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640, 640], help='image (h, w)')
     parser.add_argument('--batch-size', type=int, default=1, help='batch size')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
-    parser.add_argument('--half', action='store_true', help='FP16 half-precision export')
-    parser.add_argument('--inplace', action='store_true', help='set YOLOv5 Detect() inplace=True')
-    parser.add_argument('--train', action='store_true', help='model.train() mode')
-    parser.add_argument('--optimize', action='store_true', help='TorchScript: optimize for mobile')
-    parser.add_argument('--int8', action='store_true', help='CoreML/TF INT8 quantization')
-    parser.add_argument('--dynamic', action='store_true', help='ONNX/TF: dynamic axes')
-    parser.add_argument('--simplify', action='store_true', help='ONNX: simplify model')
-    parser.add_argument('--opset', type=int, default=12, help='ONNX: opset version')
+    parser.add_argument('--half', action='store_true', default=False, help='FP16 half-precision export')
+    parser.add_argument('--inplace', action='store_true', default=False, help='set YOLOv5 Detect() inplace=True')
+    parser.add_argument('--train', action='store_true', default=False, help='model.train() mode')
+    parser.add_argument('--optimize', action='store_true', default=False, help='TorchScript: optimize for mobile')
+    parser.add_argument('--int8', action='store_true', default=False, help='CoreML/TF INT8 quantization')
+    parser.add_argument('--dynamic', action='store_true', default=False, help='ONNX/TF: dynamic axes')
+    parser.add_argument('--simplify', action='store_true', default=False, help='ONNX: simplify model')
+    parser.add_argument('--opset', type=int, default=11, help='ONNX: opset version')
     parser.add_argument('--verbose', action='store_true', help='TensorRT: verbose log')
     parser.add_argument('--workspace', type=int, default=4, help='TensorRT: workspace size (GB)')
     parser.add_argument('--nms', action='store_true', help='TF: add NMS to model')
@@ -542,7 +543,7 @@ def parse_opt():
     parser.add_argument('--iou-thres', type=float, default=0.45, help='TF.js NMS: IoU threshold')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='TF.js NMS: confidence threshold')
     parser.add_argument('--include', nargs='+',
-                        default=['torchscript', 'onnx'],
+                        default=['tflite', 'onnx'],
                         help='torchscript, onnx, openvino, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs')
     opt = parser.parse_args()
     print_args(FILE.stem, opt)

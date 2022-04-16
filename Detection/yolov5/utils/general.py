@@ -22,6 +22,7 @@ from subprocess import check_output
 from zipfile import ZipFile
 
 import cv2
+import numpy
 import numpy as np
 import pandas as pd
 import pkg_resources as pkg

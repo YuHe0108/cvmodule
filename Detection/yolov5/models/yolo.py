@@ -18,12 +18,12 @@ if str(ROOT) not in sys.path:
 # ROOT = ROOT.relative_to(Path.cwd())  # relative
 
 
-from models.common import *
-from models.experimental import *
-from utils.autoanchor import check_anchor_order
-from utils.general import LOGGER, check_version, check_yaml, make_divisible, print_args
-from utils.plots import feature_visualization
-from utils.torch_utils import fuse_conv_and_bn, initialize_weights, model_info, scale_img, select_device, time_sync
+from Detection.yolov5.models.common import *
+from Detection.yolov5.models.experimental import *
+from Detection.yolov5.utils.autoanchor import check_anchor_order
+from Detection.yolov5.utils.general import LOGGER, check_version, check_yaml, make_divisible, print_args
+from Detection.yolov5.utils.plots import feature_visualization
+from Detection.yolov5.utils.torch_utils import fuse_conv_and_bn, initialize_weights, model_info, scale_img, select_device, time_sync
 
 try:
     import thop  # for FLOPs computation
@@ -155,6 +155,8 @@ class Model(nn.Module):
                 x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
             if profile:
                 self._profile_one_layer(m, x, dt)
+            if m._get_name() == 'Detect':
+                k = m(x)
             x = m(x)  # run
             y.append(x if m.i in self.save else None)  # save output
             if visualize:

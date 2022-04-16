@@ -10,9 +10,9 @@ from threading import Thread
 import pkg_resources as pkg
 from torch.utils.tensorboard import SummaryWriter
 
-from utils.loggers.wandb.wandb_utils import WandbLogger
-from utils.plots import plot_images, plot_results
-from utils.torch_utils import de_parallel
+from tools.loggers.wandb.wandb_utils import WandbLogger
+from tools.plots import plot_images, plot_results
+from tools.torch_utils import de_parallel
 
 LOGGERS = ('csv', 'tb', 'wandb')  # text-file, TensorBoard, Weights & Biases
 RANK = int(os.getenv('RANK', -1))

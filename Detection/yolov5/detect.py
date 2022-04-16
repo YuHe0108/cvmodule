@@ -40,11 +40,11 @@ if str(ROOT) not in sys.path:
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 from models.common import DetectMultiBackend
-from utils.datasets import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
-from utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr,
+from tools.datasets import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
+from tools.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr,
                            increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
-from utils.plots import Annotator, colors, save_one_box
-from utils.torch_utils import select_device, time_sync
+from tools.plots import Annotator, colors, save_one_box
+from tools.torch_utils import select_device, time_sync
 
 
 @torch.no_grad()
@@ -241,11 +241,12 @@ def run(weights=ROOT / 'yolov5l.pt',  # model.pt path(s)
 
 def parse_opt():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', nargs='+', type=str, default=os.path.join(ROOT, 'weights', 'best.pt'),
+    parser.add_argument('--weights', nargs='+', type=str,
+                        default=r'D:\Vortex\Project_2\sdyd_box\data\models\zhxjc\1.0.0\zhxjc_yolov5s_small.pt',
                         help='模型的权重信息 model path(s)')
-    parser.add_argument('--source', type=str, default=os.path.join(ROOT, 'data', 'images'),
+    parser.add_argument('--source', type=str, default=r'D:\Vortex\Project_4_RKNN\reference\yolov5\images',
                         help='待检测数据 file/dir/URL/glob, 0 for webcam')
-    parser.add_argument('--data', type=str, default=os.path.join(ROOT, 'data', 'elephant.yaml'),
+    parser.add_argument('--data', type=str, default=os.path.join(ROOT, 'data', 'other', 'coco128.yaml'),
                         help='数据集相关信息 (optional) dataset.yaml path')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
     parser.add_argument('--project', default=os.path.join(ROOT, 'runs', 'detect'), help='save results to project/name')
@@ -262,7 +263,8 @@ def parse_opt():
     parser.add_argument('--save-conf', action='store_true', default=False, help='save confidences in --save-txt labels')
     parser.add_argument('--save-crop', action='store_true', default=False, help='save cropped prediction boxes')
     parser.add_argument('--nosave', action='store_true', default=False, help='do not save images/videos')
-    parser.add_argument('--classes', nargs='+', type=int, help='filter by class: --classes 0, or --classes 0 2 3')
+    parser.add_argument('--classes', nargs='+', type=int, default=None,
+                        help='只检测当前类别 filter by class: --classes 0, or --classes 0 2 3')
     parser.add_argument('--agnostic-nms', action='store_true', default=False, help='class-agnostic NMS')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--visualize', action='store_true', help='visualize features')
@@ -279,6 +281,12 @@ def parse_opt():
 
 
 if __name__ == "__main__":
+    # model_2 = torch.load(r'D:\Vortex\Project_2\sdyd_box\data\models\zhxjc\1.0.0\zhxjc_yolov5s_small.pt',
+    #                      map_location='cpu')['model']
+    # model_2.float()
+    # model_2.to('cuda')
+    # model_2.eval()
     check_requirements(exclude=('tensorboard', 'thop'))
     opt_ = parse_opt()
     run(**vars(opt_))
+

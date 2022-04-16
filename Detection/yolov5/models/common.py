@@ -21,12 +21,12 @@ import yaml
 from PIL import Image
 from torch.cuda import amp
 
-from utils.datasets import exif_transpose, letterbox
-from utils.general import (LOGGER, check_requirements, check_suffix, check_version, colorstr,
+from Detection.yolov5.utils.datasets import exif_transpose, letterbox
+from Detection.yolov5.utils.general import (LOGGER, check_requirements, check_suffix, check_version, colorstr,
                                             increment_path, make_divisible, non_max_suppression,
                                             scale_coords, xywh2xyxy, xyxy2xywh)
-from utils.plots import Annotator, colors, save_one_box
-from utils.torch_utils import copy_attr, time_sync
+from Detection.yolov5.utils.plots import Annotator, colors, save_one_box
+from Detection.yolov5.utils.torch_utils import copy_attr, time_sync
 
 
 def autopad(k, p=None):  # kernel, padding
@@ -323,8 +323,9 @@ class DetectMultiBackend(nn.Module):
             cuda = torch.cuda.is_available()
             check_requirements(('onnx', 'onnxruntime-gpu' if cuda else 'onnxruntime'))
             import onnxruntime
-            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
-            session = onnxruntime.InferenceSession(w, providers=providers)
+            # providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
+            session = onnxruntime.InferenceSession(w, providers=['CPUExecutionProvider'])
+            # session = onnxruntime.InferenceSession(w)
         elif xml:  # OpenVINO
             LOGGER.info(f'Loading {w} for OpenVINO inference...')
             check_requirements(('openvino-dev',))  # requires openvino-dev: https://pypi.org/project/openvino-dev/

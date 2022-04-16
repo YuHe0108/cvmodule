@@ -29,4 +29,4 @@ def convert(data_dir, test_size=0.2, suffix=None):
 
 
 if __name__ == '__main__':
-    convert(r'D:\LasoFiles\Github\DL\yolov5-master_elephant\data\images')
+    convert(r'D:\Vortex\Project_7_huzhou\invalid', 0.1)

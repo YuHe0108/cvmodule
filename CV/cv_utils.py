@@ -104,7 +104,7 @@ def draw_contours_by_mask(image_dir,
                           max_count=8,
                           color=(255, 0, 0)):
     """将mask的轮廓绘制在原始图像上"""
-    utils.check_file(save_dir)
+    utils.check_path(save_dir)
     images_path, images_stem = utils.get_path_and_stem(image_dir)
     masks_path, masks_stem = utils.get_path_and_stem(mask_dir)
 

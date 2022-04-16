@@ -9,8 +9,8 @@ import numpy as np
 import torch
 from torch.cuda import amp
 
-from utils.general import LOGGER, colorstr
-from utils.torch_utils import profile
+from tools.general import LOGGER, colorstr
+from tools.torch_utils import profile
 
 
 def check_train_batch_size(model, imgsz=640):

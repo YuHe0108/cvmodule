@@ -8,7 +8,7 @@ import os
 
 
 def k_means_fun(inputs, save_dir=None, k_cluster=3, threshold=160):
-    utils.check_file(save_dir)
+    utils.check_path(save_dir)
     # 判断输入类别
     all_image_paths = utils.return_inputs(inputs)
     all_image_paths = utils.is_same_two_path_list(inputs, save_dir)
