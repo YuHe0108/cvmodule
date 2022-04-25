@@ -305,6 +305,22 @@ def reshape_imgs(root_dir, save_root_dir, reshape_size=(800, 800)):
     return
 
 
+def file_lines_to_list(path):
+    """读取 txt 文件，并以列表形式返回"""
+    with open(path, encoding='utf-8') as f:
+        content = f.readlines()
+    content = [x.strip() for x in content]
+    return content
+
+
+def calc_total_file_cnt(path):
+    # 计算当前路径下有多少图像
+    cnt = 0
+    for path in pathlib.Path(path).iterdir():
+        cnt += 1
+    return cnt
+
+
 if __name__ == '__main__':
     # import test_data
     #
