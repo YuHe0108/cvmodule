@@ -169,4 +169,4 @@ def kmean_anchors(dataset='./data/coco128.yaml', n=9, img_size=640, thr=4.0, gen
 
 
 if __name__ == '__main__':
-    kmean_anchors('..\\data\\elephant.yaml')
+    kmean_anchors('C:/Users/yuhe/Desktop/vechicle.yaml')  # 需要有转换好的 txt 文件
