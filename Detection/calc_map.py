@@ -61,7 +61,7 @@ class CalcMAP:
 
         self.min_overlap = 0.5
         self.min_score_thresh = 0.5  # 置信度大于该值时，认为是目标
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         self.model = self.get_model()
         self.idx2label = self.read_label()  # 标签有哪些
         self.label2idx = {label: i for i, label in self.idx2label.items()}
@@ -127,8 +127,6 @@ class CalcMAP:
         return
 
     def calc_map(self):
-        # self.label_txt_dir
-        # self.pred_dir
         self.save_calc_results_dir = os.path.join(self.root_dir, 'calc_results')  # 结果保存的路径
         plot_dir = os.path.join(self.save_calc_results_dir, 'classes')  # 保存 plot 的结果
         self.draw_pred_dir = os.path.join(self.save_calc_results_dir, 'images', 'detections_one_by_one')
@@ -415,133 +413,34 @@ class CalcMAP:
             text = "mAP = {0:.2f}%".format(mean_ap * 100)
             output_file.write(text + "\n")
             print(text)
-            """
-            计算带权重的map
-            """
-            weight_ap_dictionary = {}
-            total_num = 0
-            for class_name in sorted(gt_counter_per_class):
-                total_num += gt_counter_per_class[class_name]
-            weight_mean_ap = 0.0
-            for class_name in sorted(gt_counter_per_class):
-                class_count = gt_counter_per_class[class_name]
-                class_ap = ap_dictionary[class_name]
-                weight = class_count / total_num
-                weight_ap = weight * class_ap
-                weight_mean_ap += weight_ap
-                weight_ap_dictionary["{}, num={}".format(class_name, class_count)] = weight_ap
-                print("{}:数量={}, 权重={}, AP={},权重AP={}".format(class_name, class_count, weight, class_ap, weight_ap))
-            print("权重MAP={}".format(weight_mean_ap))
+            # 计算带权重的map
+            weight_ap_dictionary, weight_mean_ap, total_num = self.calc_weight_map(gt_counter_per_class, ap_dictionary)
 
-        if self.draw_plot:
-            window_title = "weight-mAP"
-            plot_title = "weight-mAP={0:.2f}%,total={1}".format(weight_mean_ap * 100, total_num)
-            x_label = "Average Precision"
-            output_path = os.path.join(self.save_calc_results_dir, "weight-mAP.png")
-            to_show = False
-            plot_color = 'royalblue'
-            vis_util.draw_plot_func(weight_ap_dictionary, n_classes, window_title, plot_title,
-                                    x_label, output_path, to_show, plot_color, "")
-        # Draw false negatives
+        # 绘制结果的直方图等信息
         if self.show_animation:
-            pink = (203, 192, 255)
-            for tmp_file in gt_json_files:
-                ground_truth_data = json.load(open(tmp_file))
-                start = self.json_file_dir + '/'
-                img_name = tmp_file[tmp_file.find(start) + len(start):tmp_file.rfind('_ground_truth.json')]
-                img_cumulative_path = os.path.join(self.save_calc_results_dir, 'images', f"{img_name}.jpg")
-                img = cv.imread(img_cumulative_path)
-                if img is None:
-                    img_path = os.path.join(self.img_dir, f'{img_name}.jpg')
-                    img = cv.imread(img_path)
-                # draw false negatives
-                for obj in ground_truth_data:
-                    if not obj['used']:
-                        bbgt = [int(round(float(x))) for x in obj["bbox"].split()]
-                        cv.rectangle(img, (bbgt[0], bbgt[1]), (bbgt[2], bbgt[3]), pink, 2)
-                cv.imwrite(img_cumulative_path, img)
+            self.draw_false_negative(gt_json_files)
+        if self.draw_plot:
+            self.draw_weight_mean_ap(weight_mean_ap, total_num, weight_ap_dictionary, n_classes)
+            # Plot the total number of occurrences of each class in the ground-truth
+            self.draw_ground_truth_info(gt_counter_per_class, n_classes)
 
         # Count total of detection-results iterate through all the files
-        det_counter_per_class = defaultdict(int)
-        for pred_txt_file in pathlib.Path(self.pred_dir).iterdir():
-            lines_list = tools.file_lines_to_list(pred_txt_file)  # get lines to list
-            for line in lines_list:
-                class_name = line.split()[0]
-                if class_name in self.ignore_labels:  # check if class is in ignore list,
-                    continue
-                det_counter_per_class[class_name] += 1
-
-        dr_classes = list(det_counter_per_class.keys())
-        # Plot the total number of occurrences of each class in the ground-truth
-        if self.draw_plot:
-            ground_truth_files_list = glob.glob(self.label_txt_dir + '/*.txt')
-            window_title = "ground-truth-info"
-            plot_title = "ground-truth\n"
-            plot_title += "(" + str(len(ground_truth_files_list)) + " files and " + str(n_classes) + " classes)"
-            x_label = "Number of objects per class"
-            output_path = os.path.join(self.save_calc_results_dir, "ground-truth-info.png")
-            to_show = False
-            plot_color = 'forestgreen'
-            vis_util.draw_plot_func(gt_counter_per_class, n_classes, window_title, plot_title,
-                                    x_label, output_path, to_show, plot_color, '', )
-
-        # Write number of ground-truth objects per class to results.txt
-        with open(os.path.join(self.save_calc_results_dir, 'output.txt'), 'a') as output_file:
-            output_file.write("\n# Number of ground-truth objects per class\n")
-            for class_name in sorted(gt_counter_per_class):
-                output_file.write(class_name + ": " + str(gt_counter_per_class[class_name]) + "\n")
+        det_counter_per_class, dr_classes = self.count_detection_results()
 
         # Finish counting true positives
         for class_name in dr_classes:
             if class_name not in gt_classes:
                 count_true_positives[class_name] = 0
 
-        # Plot the total number of occurences of each class in the "detection-results" folder
+        # Write number of ground-truth objects per class to results.txt
+        self.write_outputs_txt(gt_counter_per_class, det_counter_per_class, dr_classes, count_true_positives)
         if self.draw_plot:
-            pred_files_list = glob.glob(self.pred_dir + '/*.txt')
-            window_title = "detection-results-info"
-            plot_title = "detection-results\n"
-            plot_title += "(" + str(len(pred_files_list)) + " files and "
-            count_non_zero_values_in_dictionary = sum(int(x) > 0 for x in list(det_counter_per_class.values()))
-            plot_title += str(count_non_zero_values_in_dictionary) + " detected classes)"
-            x_label = "Number of objects per class"
-            output_path = os.path.join(self.save_calc_results_dir, "detection-results-info.png")
-            to_show = False
-            plot_color = 'forestgreen'
-            true_p_bar = count_true_positives
-            vis_util.draw_plot_func(det_counter_per_class, len(det_counter_per_class), window_title,
-                                    plot_title, x_label, output_path, to_show, plot_color, true_p_bar)
-
-        # Write number of detected objects per class to output.txt
-        with open(os.path.join(self.save_calc_results_dir, 'output.txt'), 'a') as output_file:
-            output_file.write("\n# Number of detected objects per class\n")
-            for class_name in sorted(dr_classes):
-                n_det = det_counter_per_class[class_name]
-                text = class_name + ": " + str(n_det)
-                text += " (tp:" + str(count_true_positives[class_name]) + ""
-                text += ", fp:" + str(n_det - count_true_positives[class_name]) + ")\n"
-                output_file.write(text)
-
-        if self.draw_plot:
+            # Plot the total number of occurrence of each class in the "detection-results" folder
+            self.draw_detection_results(count_true_positives, det_counter_per_class)
             # Draw log-average miss rate plot (Show lamr of all classes in decreasing order)
-            window_title = "lamr"
-            plot_title = "log-average miss rate"
-            x_label = "log-average miss rate"
-            output_path = os.path.join(self.save_calc_results_dir, 'lamr.png')
-            to_show = False
-            plot_color = 'royalblue'
-            vis_util.draw_plot_func(lamr_dictionary, n_classes, window_title,
-                                    plot_title, x_label, output_path, to_show, plot_color, "")
-
+            self.draw_log_average(lamr_dictionary, n_classes)
             # Draw mAP plot (Show AP's of all classes in decreasing order)
-            window_title = "mAP"
-            plot_title = "mAP = {0:.2f}%".format(mean_ap * 100)
-            x_label = "Average Precision"
-            output_path = os.path.join(self.save_calc_results_dir, "mAP.png")
-            to_show = False
-            plot_color = 'royalblue'
-            vis_util.draw_plot_func(ap_dictionary, n_classes, window_title, plot_title,
-                                    x_label, output_path, to_show, plot_color, "")
+            self.draw_map(mean_ap, ap_dictionary, n_classes)
         print(f'计算完成，一共缺少{miss_detector_cnt}个文件没有参与计算。')
         return
 
@@ -614,9 +513,142 @@ class CalcMAP:
         idx2label = {i: label.strip() for i, label in enumerate(labels)}
         return idx2label
 
+    @staticmethod
+    def calc_weight_map(gt_counter_per_class, ap_dictionary):
+        weight_ap_dictionary = {}
+        total_num = 0
+        for class_name in sorted(gt_counter_per_class):
+            total_num += gt_counter_per_class[class_name]
+        weight_mean_ap = 0.0
+        for class_name in sorted(gt_counter_per_class):
+            class_count = gt_counter_per_class[class_name]
+            class_ap = ap_dictionary[class_name]
+            weight = class_count / total_num
+            weight_ap = weight * class_ap
+            weight_mean_ap += weight_ap
+            weight_ap_dictionary["{}, num={}".format(class_name, class_count)] = weight_ap
+            print("{}:数量={}, 权重={}, AP={},权重AP={}".format(class_name, class_count, weight, class_ap, weight_ap))
+        print("权重MAP={}".format(weight_mean_ap))
+        return weight_ap_dictionary, weight_mean_ap, total_num
+
+    def draw_weight_mean_ap(self, weight_mean_ap, total_num, weight_ap_dictionary, n_classes):
+        """绘制关于 weight-map 的直方图"""
+        window_title = "weight-mAP"
+        plot_title = "weight-mAP={0:.2f}%,total={1}".format(weight_mean_ap * 100, total_num)
+        x_label = "Average Precision"
+        output_path = os.path.join(self.save_calc_results_dir, "weight-mAP.png")
+        to_show = False
+        plot_color = 'royalblue'
+        vis_util.draw_plot_func(weight_ap_dictionary, n_classes, window_title, plot_title,
+                                x_label, output_path, to_show, plot_color, "")
+        return
+
+    def draw_false_negative(self, gt_json_files):
+        pink = (203, 192, 255)
+        for tmp_file in gt_json_files:
+            ground_truth_data = json.load(open(tmp_file))
+            start = self.json_file_dir + '/'
+            img_name = tmp_file[tmp_file.find(start) + len(start):tmp_file.rfind('_ground_truth.json')]
+            img_cumulative_path = os.path.join(self.save_calc_results_dir, 'images', f"{img_name}.jpg")
+            img = cv.imread(img_cumulative_path)
+            if img is None:
+                img_path = os.path.join(self.img_dir, f'{img_name}.jpg')
+                img = cv.imread(img_path)
+            # draw false negatives
+            for obj in ground_truth_data:
+                if not obj['used']:
+                    bbgt = [int(round(float(x))) for x in obj["bbox"].split()]
+                    cv.rectangle(img, (bbgt[0], bbgt[1]), (bbgt[2], bbgt[3]), pink, 2)
+            cv.imwrite(img_cumulative_path, img)
+        return
+
+    def draw_ground_truth_info(self, gt_counter_per_class, n_classes):
+        ground_truth_files_list = glob.glob(self.label_txt_dir + '/*.txt')
+        window_title = "ground-truth-info"
+        plot_title = "ground-truth\n"
+        plot_title += "(" + str(len(ground_truth_files_list)) + " files and " + str(n_classes) + " classes)"
+        x_label = "Number of objects per class"
+        output_path = os.path.join(self.save_calc_results_dir, "ground-truth-info.png")
+        to_show = False
+        plot_color = 'forestgreen'
+        vis_util.draw_plot_func(gt_counter_per_class, n_classes, window_title, plot_title,
+                                x_label, output_path, to_show, plot_color, '', )
+        return
+
+    def draw_detection_results(self, count_true_positives, det_counter_per_class):
+        pred_files_list = glob.glob(self.pred_dir + '/*.txt')
+        window_title = "detection-results-info"
+        plot_title = "detection-results\n"
+        plot_title += "(" + str(len(pred_files_list)) + " files and "
+        count_non_zero_values_in_dictionary = sum(int(x) > 0 for x in list(det_counter_per_class.values()))
+        plot_title += str(count_non_zero_values_in_dictionary) + " detected classes)"
+        x_label = "Number of objects per class"
+        output_path = os.path.join(self.save_calc_results_dir, "detection-results-info.png")
+        to_show = False
+        plot_color = 'forestgreen'
+        true_p_bar = count_true_positives
+        vis_util.draw_plot_func(det_counter_per_class, len(det_counter_per_class), window_title,
+                                plot_title, x_label, output_path, to_show, plot_color, true_p_bar)
+        return
+
+    def draw_log_average(self, lamr_dictionary, n_classes):
+        # Draw log-average miss rate plot (Show lamr of all classes in decreasing order)
+        window_title = "lamr"
+        plot_title = "log-average miss rate"
+        x_label = "log-average miss rate"
+        output_path = os.path.join(self.save_calc_results_dir, 'lamr.png')
+        to_show = False
+        plot_color = 'royalblue'
+        vis_util.draw_plot_func(lamr_dictionary, n_classes, window_title,
+                                plot_title, x_label, output_path, to_show, plot_color, "")
+        return
+
+    def draw_map(self, mean_ap, ap_dictionary, n_classes):
+        window_title = "mAP"
+        plot_title = "mAP = {0:.2f}%".format(mean_ap * 100)
+        x_label = "Average Precision"
+        output_path = os.path.join(self.save_calc_results_dir, "mAP.png")
+        to_show = False
+        plot_color = 'royalblue'
+        vis_util.draw_plot_func(ap_dictionary, n_classes, window_title, plot_title,
+                                x_label, output_path, to_show, plot_color, "")
+        return
+
+    def count_detection_results(self):
+        # Count total of detection-results iterate through all the files
+        det_counter_per_class = defaultdict(int)
+        for pred_txt_file in pathlib.Path(self.pred_dir).iterdir():
+            lines_list = tools.file_lines_to_list(pred_txt_file)  # get lines to list
+            for line in lines_list:
+                class_name = line.split()[0]
+                if class_name in self.ignore_labels:  # check if class is in ignore list,
+                    continue
+                det_counter_per_class[class_name] += 1
+        dr_classes = list(det_counter_per_class.keys())
+        return det_counter_per_class, dr_classes
+
+    def write_outputs_txt(self, gt_counter_per_class, det_counter_per_class, dr_classes, count_true_positives):
+        """将输出信息写入至 txt 文件中"""
+        # Write number of ground-truth objects per class to results.txt
+        with open(os.path.join(self.save_calc_results_dir, 'output.txt'), 'a') as output_file:
+            output_file.write("\n# Number of ground-truth objects per class\n")
+            for class_name in sorted(gt_counter_per_class):
+                output_file.write(class_name + ": " + str(gt_counter_per_class[class_name]) + "\n")
+
+        # Write number of detected objects per class to output.txt
+        with open(os.path.join(self.save_calc_results_dir, 'output.txt'), 'a') as output_file:
+            output_file.write("\n# Number of detected objects per class\n")
+            for class_name in sorted(dr_classes):
+                n_det = det_counter_per_class[class_name]
+                text = class_name + ": " + str(n_det)
+                text += " (tp:" + str(count_true_positives[class_name]) + ""
+                text += ", fp:" + str(n_det - count_true_positives[class_name]) + ")\n"
+                output_file.write(text)
+        return
+
 
 if __name__ == '__main__':
-    WEIGHT_PATH = r'D:\Vortex\Project_7_huzhou\waste_trash_device1280_v1.24.pt'  # 模型权重路径
+    WEIGHT_PATH = r'D:\Vortex\Project_7_huzhou\weights\waste_trash_device1280_v1.30.144.pt'  # 模型权重路径
     DATA_DIR = r'D:\Vortex\Project_7_huzhou\invalid'  # 数据集的路径
     LABEL_FILE = r'D:\Vortex\SELF\cvmodule\Detection\yolov5\data\label.txt'
     calc_map = CalcMAP(WEIGHT_PATH, LABEL_FILE, (1280, 1280), DATA_DIR)
