@@ -32,7 +32,7 @@ except ImportError:
     thop = None
 
 
-class DetectPrev(nn.Module):
+class Detect(nn.Module):
     stride = None  # strides computed during build
     onnx_dynamic = False  # ONNX export parameter
 
@@ -83,7 +83,7 @@ class DetectPrev(nn.Module):
         return grid, anchor_grid
 
 
-class Detect(nn.Module):
+class DetectPrev(nn.Module):
     stride = None  # strides computed during build
     onnx_dynamic = False  # ONNX export parameter
 
