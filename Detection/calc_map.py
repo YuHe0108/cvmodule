@@ -45,7 +45,7 @@ class CalcMAP:
         self.input_shape = img_shape
         self.weight_path = weight_path
 
-        self.cover_detect_results = False  # 已经存在的预测结果是否覆盖
+        self.cover_detect_results = True  # 已经存在的预测结果是否覆盖
 
         self.root_dir = 'run_map_results'  # 将 预测结果、计算 map 产生的结果统一存放的路径
         self.pred_dir = None  # 预测结果 txt 文件的保存位置
@@ -648,7 +648,7 @@ class CalcMAP:
 
 
 if __name__ == '__main__':
-    WEIGHT_PATH = r'D:\Vortex\Project_7_huzhou\weights\waste_trash_device1280_v1.30.144.pt'  # 模型权重路径
+    WEIGHT_PATH = r'D:\Vortex\Project_7_huzhou\weights\waste_trash_device1280_v1.31.pt'  # 模型权重路径
     DATA_DIR = r'D:\Vortex\Project_7_huzhou\invalid'  # 数据集的路径
     LABEL_FILE = r'D:\Vortex\SELF\cvmodule\Detection\yolov5\data\label.txt'
     calc_map = CalcMAP(WEIGHT_PATH, LABEL_FILE, (1280, 1280), DATA_DIR)
