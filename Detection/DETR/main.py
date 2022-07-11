@@ -1,12 +1,12 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-import argparse
-import datetime
+import time
 import json
 import random
-import time
+import argparse
+import datetime
+import numpy as np
 from pathlib import Path
 
-import numpy as np
 import torch
 from torch.utils.data import DataLoader, DistributedSampler
 
@@ -25,8 +25,7 @@ def get_args_parser():
     parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--epochs', default=300, type=int)
     parser.add_argument('--lr_drop', default=200, type=int)
-    parser.add_argument('--clip_max_norm', default=0.1, type=float,
-                        help='gradient clipping max norm')
+    parser.add_argument('--clip_max_norm', default=0.1, type=float, help='gradient clipping max norm')
 
     # Model parameters
     parser.add_argument('--frozen_weights', type=str, default=None,
@@ -57,7 +56,7 @@ def get_args_parser():
     parser.add_argument('--pre_norm', action='store_true')
 
     # * Segmentation
-    parser.add_argument('--masks', action='store_true',
+    parser.add_argument('--masks', action='store_true', default=False,
                         help="Train segmentation head if the flag is provided")
 
     # Loss
@@ -86,14 +85,14 @@ def get_args_parser():
 
     parser.add_argument('--output_dir', default='',
                         help='path where to save, empty for no saving')
-    parser.add_argument('--device', default='cuda',
-                        help='device to use for training / testing')
+    parser.add_argument('--device', default='cuda:0',
+                        help='device to use for training / testing')  # 设备号
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume', default='', help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
     parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--num_workers', default=2, type=int)
+    parser.add_argument('--num_workers', default=0, type=int)
 
     # distributed training parameters
     parser.add_argument('--world_size', default=1, type=int,

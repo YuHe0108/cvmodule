@@ -74,19 +74,19 @@ def to_numpy(tensor):
     return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
 
 
-weights = r'D:\Vortex\Project_2\sdyd_box\data\models\models\zhxjc\1.0.0\zhxjc_yolov5s_small.onnx'
+weights = r'C:\Users\yuhe\Desktop\efficient_lite2_left.onnx'
 
 to_tensor = transforms.ToTensor()
 
-img = cv.imread(r'D:\Vortex\Project_4_RKNN\3399_pro_env_and_testCode\yolov5\bus.jpg')
-img = cv.resize(img, (640, 640))
+img = cv.imread(r'D:\Vortex\DATASET\valid_data\2\30.jpg')
+img = cv.resize(img, (224, 224))
 img = to_tensor(img)
 img = img.unsqueeze_(0)
 
 model = ONNXModel(weights)
 inputs = {model.get_input_name()[0]: to_numpy(img)}
-outputs = model.onnx_session.run(None, inputs)  # 只有最后的 output 才是最终的输出值
-print(img.shape, outputs)
+outputs = model.onnx_session.run(None, inputs)[0][0]  # 只有最后的 output 才是最终的输出值
+print(img.shape, outputs, np.exp(outputs))
 for a in outputs:
     print(a.shape)
 
