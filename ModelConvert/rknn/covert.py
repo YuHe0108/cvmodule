@@ -2,20 +2,22 @@
 from rknn.api import RKNN
 import torch
 
+import efficient_lite
 
-def export_jit_pt():
+
+def export_jit_pt(model_path, save_name):
     """模型导出为 jit pt"""
-    model = torch.load('./resnet50.pt', map_location='cpu')
+    model = torch.load(model_path, map_location='cpu')
     model.eval()
-    trace_model = torch.jit.trace(model, torch.Tensor(1, 3, 384, 384))
-    trace_model.save('./resnet50_jit.pt')
+    trace_model = torch.jit.trace(model, torch.Tensor(1, 3, 224, 224))
+    trace_model.save(f'./{save_name}_jit.pt')
     return
 
 
-def export_rknn():
-    export_jit_pt()  # 先导出 pt 模型
-    model = r'./resnet50_jit.pt'
-    input_size_list = [[3, 384, 384]]
+def export_rknn(model_path, save_name):
+    export_jit_pt(model_path, save_name)  # 先导出 pt 模型
+    model = f'./{save_name}_jit.pt'
+    input_size_list = [[3, 224, 224]]
 
     rknn = RKNN()
     # pre-process config
@@ -42,7 +44,7 @@ def export_rknn():
 
     # Export RKNN model
     print('--> Export RKNN model')
-    ret = rknn.export_rknn('./resnet50.rknn')
+    ret = rknn.export_rknn(f'./{save_name}.rknn')
     if ret != 0:
         print('Export resnet50.rknn failed!')
         exit(ret)
@@ -71,4 +73,4 @@ def run(model_file, img):
 
 
 if __name__ == '__main__':
-    export_rknn()
+    export_rknn('', '')
