@@ -522,9 +522,9 @@ def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', type=str, default=ROOT / 'data/coco128.yaml', help='dataset.yaml path')
     parser.add_argument('--weights', nargs='+', type=str, help='model.pt path(s)',
-                        default=r'D:\Vortex\SELF\cvmodule\Detection\yolov5\weights\yolov5s.pt')
+                        default=r'C:\Users\yuhe\Desktop\rknn\0713.pt')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640, 640], help='image (h, w)')
-    parser.add_argument('--batch-size', type=int, default=2, help='batch size')
+    parser.add_argument('--batch-size', type=int, default=1, help='batch size')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--half', action='store_true', default=False, help='FP16 half-precision export')
     parser.add_argument('--inplace', action='store_true', default=False, help='set YOLOv5 Detect() inplace=True')
@@ -532,7 +532,7 @@ def parse_opt():
     parser.add_argument('--optimize', action='store_true', default=False, help='TorchScript: optimize for mobile')
     parser.add_argument('--int8', action='store_true', default=False, help='CoreML/TF INT8 quantization')
     parser.add_argument('--dynamic', action='store_true', default=False, help='ONNX/TF: dynamic axes')
-    parser.add_argument('--simplify', action='store_true', default=False, help='ONNX: simplify model')
+    parser.add_argument('--simplify', action='store_true', default=True, help='ONNX: simplify model')
     parser.add_argument('--opset', type=int, default=11, help='ONNX: opset version')
     parser.add_argument('--verbose', action='store_true', help='TensorRT: verbose log')
     parser.add_argument('--workspace', type=int, default=4, help='TensorRT: workspace size (GB)')
@@ -543,7 +543,7 @@ def parse_opt():
     parser.add_argument('--iou-thres', type=float, default=0.45, help='TF.js NMS: IoU threshold')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='TF.js NMS: confidence threshold')
     parser.add_argument('--include', nargs='+',
-                        default=['tflite'],
+                        default=['onnx'],
                         help='torchscript, onnx, openvino, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs')
     opt = parser.parse_args()
     print_args(FILE.stem, opt)
