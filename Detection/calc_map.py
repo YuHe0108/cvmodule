@@ -24,13 +24,26 @@ from Detection.utils import calc
 
 
 class CalcMAP:
-    def __init__(self, weight_path, label_file, img_shape, data_dir=None, img_dir=None, xml_dir=None):
+    def __init__(self,
+                 weight_path,
+                 label_file,
+                 img_shape,
+                 data_dir=None,
+                 img_dir=None,
+                 xml_dir=None,
+                 need_pred=False,
+                 int_label=False,
+                 label_to_idx=None,
+                 root_dir=None):
         """
         img_shape:      测试 resize 图像尺寸
         label_file:     标签文件，txt 格式即可
         data_dir:       图像和 xml 文件放在一起，则只提供当前路径即可
         img_dir:        验证集图像的路径
         xml_dir:        对应图像 xml 标签的路径
+        need_pred:      是否需要计算, 不需要计算直接计算
+        int_label:      是否是数字形式的 label, 还是将label转换为字符串
+        root_dir:       保存的目录位置
         """
         assert data_dir is not None or (img_dir is not None and xml_dir is not None)
         if data_dir is not None:
@@ -47,7 +60,7 @@ class CalcMAP:
 
         self.cover_detect_results = True  # 已经存在的预测结果是否覆盖
 
-        self.root_dir = 'run_map_results'  # 将 预测结果、计算 map 产生的结果统一存放的路径
+        self.root_dir = 'run_map_results' if root_dir is None else root_dir  # 将 预测结果、计算 map 产生的结果统一存放的路径
         self.pred_dir = None  # 预测结果 txt 文件的保存位置
         self.label_txt_dir = None  # txt 标签抓换后的存放路径
         self.save_calc_results_dir = None  # 计算 map 保存结果的路径
@@ -61,16 +74,25 @@ class CalcMAP:
 
         self.min_overlap = 0.5
         self.min_score_thresh = 0.5  # 置信度大于该值时，认为是目标
-        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        # self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cpu'
         self.model = self.get_model()
         self.idx2label = self.read_label()  # 标签有哪些
-        self.label2idx = {label: i for i, label in self.idx2label.items()}
+        self.label2idx = label_to_idx
+        if label_to_idx is None:
+            self.label2idx = {label: i for i, label in self.idx2label.items()}
         self.ignore_labels = set()  # 哪些类不参与 map 计算，自行添加
         self.img_suffix = {'.jpg', 'jpeg', 'JPG', 'JPEG', 'png'}  # 数据集图像的 后缀有哪些
 
+        self.need_pred = need_pred
+        self.int_label = int_label
+        self.pred_dir = os.path.join(self.root_dir, 'predict_txt')  # 预测结果的存放路径
+        tools.check_path(self.pred_dir)
+
     def calculate(self):
         self.xml2txt()  # 首先将 xml 文件转换为 txt
-        self.pred()  # 对每张图预测推理，并将推理结果保存至本地 txt 文档
+        if self.need_pred:
+            self.pred()  # 对每张图预测推理，并将推理结果保存至本地 txt 文档
         self.calc_map()  # 根据预测结果和推理结果计算 map
         return
 
@@ -98,6 +120,8 @@ class CalcMAP:
                 ymin = int(member[4][1].text)
                 xmax = int(member[4][2].text)
                 ymax = int(member[4][3].text)
+                if self.int_label:
+                    class_name = self.label2idx.get(class_name)
                 msg = "{} {} {} {} {} \n".format(class_name, xmin, ymin, xmax, ymax)
                 result_list.append(msg)
 
@@ -109,8 +133,6 @@ class CalcMAP:
 
     def pred(self):
         self.img_dir = self.img_dir if self.img_dir is not None else self.data_dir  # 存放 invalid 图像的路径
-        self.pred_dir = os.path.join(self.root_dir, 'predict_txt')  # 预测结果的存放路径
-        tools.check_path(self.pred_dir)
 
         print('开始推理图像....')
         for img_file in tqdm.tqdm(pathlib.Path(self.img_dir).iterdir()):
@@ -492,6 +514,7 @@ class CalcMAP:
         return boxes, scores, classes
 
     def save_pred_txt(self, img_name, ori_img, boxes, scores, classes):
+        """将预测的结果保存为 txt 文件"""
         height, width = ori_img.shape[:2]
         result_list = []
         for idx, class_id in enumerate(classes[0]):
@@ -500,8 +523,10 @@ class CalcMAP:
                 bbox = boxes[0, idx]
                 ymin, xmin = int(bbox[0] * height), int(bbox[1] * width)
                 ymax, xmax = int(bbox[2] * height), int(bbox[3] * width)
+                if not self.int_label:  # 将 int 转换为label字符串
+                    class_id = self.idx2label[int(class_id)]
                 msg = "{} {} {} {} {} {}\n".format(
-                    self.idx2label[int(class_id)], conf_score, xmin, ymin, xmax, ymax)  # 类别、置信度和坐标
+                    class_id, conf_score, xmin, ymin, xmax, ymax)  # 类别、置信度和坐标
                 result_list.append(msg)
         with open(os.path.join(self.pred_dir, "{}.txt".format(img_name)), "w") as f:  # 以图像名字为txt名字进行保存
             f.writelines(result_list)  # class_id, conf_score, xmin, ymin, xmax, ymax
@@ -649,7 +674,10 @@ class CalcMAP:
 
 if __name__ == '__main__':
     WEIGHT_PATH = r'D:\Vortex\Project_7_huzhou\weights\waste_trash_device1280_v1.31.pt'  # 模型权重路径
-    DATA_DIR = r'D:\Vortex\Project_7_huzhou\invalid'  # 数据集的路径
-    LABEL_FILE = r'D:\Vortex\SELF\cvmodule\Detection\yolov5\data\label.txt'
-    calc_map = CalcMAP(WEIGHT_PATH, LABEL_FILE, (1280, 1280), DATA_DIR)
+    DATA_DIR = r'C:\Users\yuhe\Desktop\image_test'  # 数据集的路径
+    LABEL_FILE = r'D:\Vortex\SELF\cvmodule\Detection\yolov5\data\label.txt'  # 标签
+    calc_map = CalcMAP(WEIGHT_PATH, LABEL_FILE, (1280, 1280), DATA_DIR, need_pred=False, int_label=True,
+                       label_to_idx={'LVSELJB': 0, 'ZSLJB': 0, 'HONGSELJB': 0, 'HUANGSELJB': 0, 'LANSELJB': 0,
+                                     'SLP': 1, 'NPZH': 4, 'YLG': 7},
+                       root_dir=r'C:\Users\yuhe\Desktop\calc')
     calc_map.calculate()
