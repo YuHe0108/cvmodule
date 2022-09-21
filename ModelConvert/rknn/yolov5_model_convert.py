@@ -3,10 +3,10 @@ import cv2
 import numpy as np
 from rknn.api import RKNN
 
-ONNX_MODEL = r'C:\Users\yuhe\Desktop\rknn\0713.onnx'
-RKNN_MODEL = r'C:\Users\yuhe\Desktop\rknn\0713.rknn'
-IMG_PATH = r'1.jpg'
-DATASET = r'dataset.txt'
+ONNX_MODEL = r'D:\Vortex\SVN\湖州垃圾分类质量\20220902\0902.onnx'
+RKNN_MODEL = r'D:\Vortex\SVN\湖州垃圾分类质量\20220902\0902.rknn'
+IMG_PATH = r'C:\Users\yuhe\Desktop\rknn\1.jpg'
+DATASET = r'C:\Users\yuhe\Desktop\rknn\dataset.txt'
 
 QUANTIZE_ON = True
 
@@ -248,7 +248,7 @@ if __name__ == '__main__':
     # Load ONNX model
     print('--> Loading model')
     # ret = rknn.load_onnx(model=ONNX_MODEL, outputs=['378', '439', '500'])
-    ret = rknn.load_onnx(model=ONNX_MODEL, outputs=['613', '672', '731'])  # 需要修改的地方
+    ret = rknn.load_onnx(model=ONNX_MODEL, outputs=['672', '731', '790'])  # 需要修改的地方
     if ret != 0:
         print('Load yolov5 failed!')
         exit(ret)

@@ -1,6 +1,16 @@
 import numpy as np
 import cv2
 
+labels = ['full-trash-bag',
+          'plastic-bag',
+          'napkin',
+          'color-packing',
+          'kraft',
+          'bottle',
+          'can',
+          'other']
+int_2_label = {i: label for i, label in enumerate(labels)}
+
 
 def image_process(img, value_range, input_format='channel_first'):
     """ 将图像归一化至 01（-1, 1）之间，并转换 HWC ~ CHW, 增加维度： BCHW"""
@@ -35,3 +45,15 @@ def letterbox(im, new_shape=(640, 640), color=(0, 0, 0)):
     left, right = int(round(dw / 2 - 0.1)), int(round(dw / 2 + 0.1))
     im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
     return im
+
+
+def draw_img(img, box, color, suffix=''):
+    for x1, y1, x2, y2, cls in box:
+        cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+        if color == (0, 0, 255):
+            cv2.putText(img, int_2_label[int(cls)] + "-" + suffix, (x1, y1),
+                        cv2.FONT_HERSHEY_PLAIN, 2, color, 2)
+        else:
+            cv2.putText(img, int_2_label[int(cls)] + "-" + suffix, (x2, y2),
+                        cv2.FONT_HERSHEY_PLAIN, 2, color, 2)
+    return img

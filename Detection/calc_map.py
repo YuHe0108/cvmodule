@@ -34,7 +34,8 @@ class CalcMAP:
                  need_pred=False,
                  int_label=False,
                  label_to_idx=None,
-                 root_dir=None):
+                 root_dir=None,
+                 pred_dir=None):
         """
         img_shape:      测试 resize 图像尺寸
         label_file:     标签文件，txt 格式即可
@@ -82,11 +83,14 @@ class CalcMAP:
         if label_to_idx is None:
             self.label2idx = {label: i for i, label in self.idx2label.items()}
         self.ignore_labels = set()  # 哪些类不参与 map 计算，自行添加
-        self.img_suffix = {'.jpg', 'jpeg', 'JPG', 'JPEG', 'png'}  # 数据集图像的 后缀有哪些
+        self.img_suffix = {'.jpg', '.jpeg', '.JPG', '.JPEG', '.png'}  # 数据集图像的 后缀有哪些
 
         self.need_pred = need_pred
         self.int_label = int_label
-        self.pred_dir = os.path.join(self.root_dir, 'predict_txt')  # 预测结果的存放路径
+        self.pred_dir = pred_dir
+        if self.pred_dir is None:
+            self.pred_dir = os.path.join(self.root_dir, 'predict_txt')  # 预测结果的存放路径
+        self.label_txt_dir = self.data_dir
         tools.check_path(self.pred_dir)
 
     def calculate(self):
@@ -103,9 +107,8 @@ class CalcMAP:
         for xml_file in pathlib.Path(xml_dir).iterdir():
             file_name = pathlib.Path(xml_file).stem
             save_txt_path = os.path.join(xml_dir, "{}.txt".format(file_name))  # 需要保存的txt文件
-            if xml_file.suffix != '.xml' or os.path.exists(save_txt_path):
+            if xml_file.suffix != '.xml':
                 continue
-
             # 读取 xml 文件
             tree = ET.parse(xml_file)
             root = tree.getroot()
@@ -115,6 +118,7 @@ class CalcMAP:
                 class_name = member[0].text
                 idx = self.label2idx.get(class_name, -1)  # 当前不存在于标签中
                 if idx < 0:
+                    print(class_name)
                     continue
                 xmin = int(member[4][0].text)
                 ymin = int(member[4][1].text)
@@ -523,8 +527,9 @@ class CalcMAP:
                 bbox = boxes[0, idx]
                 ymin, xmin = int(bbox[0] * height), int(bbox[1] * width)
                 ymax, xmax = int(bbox[2] * height), int(bbox[3] * width)
+                class_id = int(class_id)
                 if not self.int_label:  # 将 int 转换为label字符串
-                    class_id = self.idx2label[int(class_id)]
+                    class_id = self.idx2label[class_id]
                 msg = "{} {} {} {} {} {}\n".format(
                     class_id, conf_score, xmin, ymin, xmax, ymax)  # 类别、置信度和坐标
                 result_list.append(msg)
@@ -673,11 +678,68 @@ class CalcMAP:
 
 
 if __name__ == '__main__':
+    c = {'full_transparent_trash_bag': 0, 'full_black_trash_bag': 0, 'full_red_trash_bag': 0,
+         'full_white_trash_bag': 0, 'full_blue_trash_bag': 0,
+         'hz_in_full_red_trash_bag': 0, 'hz_in_full_purple_trash_bag': 0, 'hz_in_full_blue_trash_bag': 0,
+         'hz_in_full_green_trash_bag': 0, 'full_transparent_bubble_bag': 0, 'full_green_trash_bag': 0,
+         'hz_in_full_white_trash_bag': 0, 'hz_in_full_transparent_trash_bag': 0,
+         'hz_in_full_black_trash_bag': 0, 'full_purple_trash_bag': 0, 'full_yellow_trash_bag': 0,
+         'hz_in_full_yellow_trash_bag': 0, 'hz_in_full_transparent_bubble_bag': 0,
+         'plastic_bag': 1, 'hz_in_plastic_bag': 1,
+         'napkin': 2, 'hz_in_napkin': 2,
+         'hz_in_color_paper_box': 3, 'color_paper_box': 3,
+         'kraft_paper_box': 4, 'hz_in_kraft_paper_box': 4,
+         'plastic_bottle': 5, 'hz_in_plastic_bottle': 5,
+         'can': 6, 'hz_in_can': 6,
+         }
+    a = {"full-trash-bag": 0, 'full_trash_bag': 0,
+         "HONGSELJB": 0, "HUANGSELJB": 0, "LANSELJB": 0, "ZSLJB": 0, "LVSELJB": 0,
+         'full_blue_trash_bag': 0, "hz_in_full_yellow_trash_bag": 0,
+         'full_transparent_trash_bag': 0,
+         'hz_in_full_black_trash_bag': 0,
+         'hz_in_full_blue_trash_bag': 0,
+         'full_red_trash_bag': 0,
+         "hz_in_full_transparent_trash_bag": 0,
+         'full_green_trash_bag': 0,
+         'full_yellow_trash_bag': 0,
+         'full_transparent_bubble_bag': 0,
+         'hz_in_full_red_trash_bag': 0,
+         'hz_in_full_white_trash_bag': 0,
+         'full_purple_trash_bag': 0,
+         'full_white_trash_bag': 0,
+         'full_black_trash_bag': 0,
+         'plastic-bag': 1, 'plastic_bag': 1, "hz_in_plastic_bag": 1,
+         'napkin': 2, "hz_in_napkin": 2,
+         'color-packing': 3, 'color_paper_box': 3, "hz_in_color_paper_box": 3,
+         'kraft': 4, "NPZH": 4, 'kraft_paper_box': 4, 'hz_in_kraft_paper_box': 4,
+         'bottle': 5, "SLP": 5, 'plastic_bottle': 5,
+         'can': 6, 'YLG': 6, 'hz_in_can': 6}
+    b = {"full_trash_bag": 0, 'full-trash-bag': 0,
+         "plastic-bag": 1,
+         "napkin": 2,
+         "color-packing": 3,
+         'bottle': 5,
+         'can': 6}
     WEIGHT_PATH = r'D:\Vortex\Project_7_huzhou\weights\waste_trash_device1280_v1.31.pt'  # 模型权重路径
-    DATA_DIR = r'C:\Users\yuhe\Desktop\image_test'  # 数据集的路径
     LABEL_FILE = r'D:\Vortex\SELF\cvmodule\Detection\yolov5\data\label.txt'  # 标签
-    calc_map = CalcMAP(WEIGHT_PATH, LABEL_FILE, (1280, 1280), DATA_DIR, need_pred=False, int_label=True,
-                       label_to_idx={'LVSELJB': 0, 'ZSLJB': 0, 'HONGSELJB': 0, 'HUANGSELJB': 0, 'LANSELJB': 0,
-                                     'SLP': 1, 'NPZH': 4, 'YLG': 7},
-                       root_dir=r'C:\Users\yuhe\Desktop\calc')
-    calc_map.calculate()
+    root = r'C:\Users\yuhe\Desktop\valid_data\predict\ori_pred'
+    DATA_DIRS = [r'C:\Users\yuhe\Desktop\valid_data\2',
+                 r'C:\Users\yuhe\Desktop\valid_data\1',
+                 r'C:\Users\yuhe\Desktop\valid_data\3',
+                 ]  # 数据集的路径
+    # for path in pathlib.Path(root).iterdir():
+    for _ in range(3):
+        predict_root = str(root)
+        print(predict_root)
+        PRED_DIRS = [r'predict_txt1',
+                     r'predict_txt2',
+                     r'predict_txt3']
+        for i in range(len(DATA_DIRS)):
+            DATA_DIR = DATA_DIRS[i]
+            PRED_DIR = os.path.join(predict_root, PRED_DIRS[i])
+            print(DATA_DIR, PRED_DIR)
+            calc_map = CalcMAP(WEIGHT_PATH, LABEL_FILE, (960, 960), DATA_DIR,
+                               need_pred=False, int_label=True, label_to_idx=a,
+                               root_dir=r'C:\Users\yuhe\Desktop\valid_data\predict',
+                               pred_dir=PRED_DIR)
+            calc_map.calculate()
