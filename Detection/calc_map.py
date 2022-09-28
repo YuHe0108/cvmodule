@@ -512,25 +512,6 @@ class CalcMAP:
             df = ori_data.append(df)
         df.to_excel(save_pred_res_path, index=False)
 
-        """ # 计算 PR 值
-        print(gt_classes)
-        pr_val_count = {}
-        dif_min_pair = {}  # p 和 r 相差最小的值和对应的 threshold
-        for c_threshold in np.linspace(0, 1, 11):
-            pr_val = self.calc_pr_val(gt_classes, confidence_threshold=c_threshold)
-            pr_val_count[c_threshold] = pr_val
-
-        for k, val in pr_val_count.items():
-            for c_idx, (p_val, r_val) in val.items():
-                dif = np.abs(p_val, r_val)
-                if c_idx not in dif_min_pair:
-                    dif_min_pair[c_idx] = [p_val, r_val, k]
-                else:
-                    c_val = dif_min_pair[c_idx][-1]
-                    dif_min_pair = []
-                # 两者的差值
-                print(c_idx, p_val, r_val)
-        """
         # Write number of ground-truth objects per class to results.txt
         self.write_outputs_txt(gt_counter_per_class, det_counter_per_class, dr_classes, count_true_positives)
         if self.draw_plot:
@@ -542,166 +523,6 @@ class CalcMAP:
             self.draw_map(mean_ap, ap_dictionary, n_classes)
         print(f'计算完成，一共缺少{miss_detector_cnt}个文件没有参与计算。')
         return
-
-    def calc_pr_val(self, gt_classes, confidence_threshold):
-        """根据置信度计算多组 PR 值"""
-        gt_json_files = []
-        miss_detector_cnt = 0  # 缺少多少预测的 txt 文件
-        gt_counter_per_class = defaultdict(int)  # 记录每个类在总数据集中的数量
-        counter_images_per_class = defaultdict(int)  # 记录每个类出现在多少张图像中
-
-        for label_txt_file in pathlib.Path(self.label_txt_dir).iterdir():
-            if pathlib.Path(label_txt_file).suffix != '.txt':
-                continue
-            label_txt_file_name = pathlib.Path(label_txt_file).stem
-            pred_txt_file_path = os.path.join(self.pred_dir, f'{label_txt_file_name}.txt')  # 预测的txt路径
-            if not os.path.exists(pred_txt_file_path):
-                print(f'预测文件不存在：{label_txt_file_name}')
-                miss_detector_cnt += 1
-                continue
-
-            is_difficult = False
-            bounding_boxes = []  # 真实标注框的信息
-            already_seen_classes = set()  # 当前图像有相同类出现两个以上时，只算一次
-            lines_list = tools.file_lines_to_list(
-                os.path.join(self.label_txt_dir, label_txt_file))  # 读取txt文档，并返回列表形式
-            class_name = left = top = right = bottom = _difficult = None
-            for line in lines_list:  # 读取 label txt 信息
-                try:
-                    if "difficult" in line:
-                        class_name, left, top, right, bottom, _difficult = line.split()
-                        is_difficult = True
-                    else:
-                        class_name, left, top, right, bottom = line.split()
-                except ValueError:
-                    print("预测 txt 文档格式不正确！")
-
-                if class_name in self.ignore_labels:  # 是否放弃计算某些类的 map
-                    continue
-                bbox = left + " " + top + " " + right + " " + bottom  # 目标预测框信息
-                if is_difficult:
-                    bounding_boxes.append({"class_name": class_name, "bbox": bbox, "used": False, "difficult": True})
-                    is_difficult = False
-                else:
-                    bounding_boxes.append({"class_name": class_name, "bbox": bbox, "used": False})
-
-                    gt_counter_per_class[class_name] += 1  # 记录每个类的数量
-
-                    if class_name not in already_seen_classes:  # 记录每个类在出现在多少张图像中
-                        already_seen_classes.add(class_name)
-                        counter_images_per_class[class_name] += 1
-
-            # 将标签重新保存为 json 格式
-            label_json_file = os.path.join(self.json_file_dir, f"{label_txt_file_name}_ground_truth.json")
-            gt_json_files.append(label_json_file)
-            with open(label_json_file, 'w') as outfile:
-                json.dump(bounding_boxes, outfile)
-
-        for class_index, class_name in enumerate(gt_classes):  # 按照类别逐个计算
-            bounding_boxes = []
-            pred_class_name = confidence = left = top = right = bottom = None
-            for pred_txt_file in pathlib.Path(self.pred_dir).iterdir():
-                pred_txt_file_name = pathlib.Path(pred_txt_file).stem
-                label_txt_file = os.path.join(self.label_txt_dir, f'{pred_txt_file_name}.txt')
-                if class_index == 0:
-                    if not os.path.exists(label_txt_file):
-                        print('label txt file not exist', label_txt_file)
-                lines = tools.file_lines_to_list(pred_txt_file)
-                for line in lines:
-                    try:
-                        pred_class_name, confidence, left, top, right, bottom = line.split()
-                    except ValueError:
-                        print(f'读取模型预测的txt文件错误：{pred_txt_file_name}.')
-
-                    if pred_class_name == class_name and float(confidence) > confidence_threshold:  # 大于指定的阈值
-                        bbox = left + " " + top + " " + right + " " + bottom
-                        bounding_boxes.append({"confidence": confidence, "file_name": pred_txt_file_name, "bbox": bbox})
-            # 按照置信度从大到小排序, 并将预测结果保存为json文件，保存的路径于 GT 相同
-            bounding_boxes.sort(key=lambda x: float(x['confidence']), reverse=True)
-            with open(os.path.join(self.json_file_dir, f'{class_name}_dr.json'), 'w') as outfile:
-                json.dump(bounding_boxes, outfile)
-
-        # 计算在当前置信度阈值下的：precision\recall
-        sum_ap = 0.0
-        ap_dictionary = {}  # 每个类别对应一个map值
-        count_true_positives = {}
-        pr_val = {}
-        for class_index, class_name in enumerate(gt_classes):
-            count_true_positives[class_name] = 0
-            # 加载模型的预测结果
-            dr_file = os.path.join(self.json_file_dir, f'{class_name}_dr.json')
-            dr_data = json.load(open(dr_file))
-            # 将预测值 和 GT 进行匹配
-            nd = len(dr_data)
-            tp, fp = [0] * nd, [0] * nd
-            for idx, detection in enumerate(dr_data):
-                file_name = detection["file_name"]
-                bb = [float(x) for x in detection["bbox"].split()]  # 模型预测的 obj-box
-
-                # 读取 gt 的 json 文件
-                gt_file = os.path.join(self.json_file_dir, f"{file_name}_ground_truth.json")
-                ground_truth_data = json.load(open(gt_file))
-                ovmax = gt_match = -1
-                for obj in ground_truth_data:
-                    # look for a class_name match
-                    if obj["class_name"] == class_name:  # 模型预测和标签的类别一致，计算
-                        bbgt = [float(x) for x in obj["bbox"].split()]
-                        bi = [max(bb[0], bbgt[0]), max(bb[1], bbgt[1]),
-                              min(bb[2], bbgt[2]), min(bb[3], bbgt[3])]
-                        iw = bi[2] - bi[0] + 1
-                        ih = bi[3] - bi[1] + 1
-                        if iw > 0 and ih > 0:  # 计算二者的 IOU
-                            ua = (bb[2] - bb[0] + 1) * (bb[3] - bb[1] + 1) + (
-                                    bbgt[2] - bbgt[0] + 1) * (bbgt[3] - bbgt[1] + 1) - iw * ih
-                            ov = iw * ih / ua
-                            if ov > ovmax:
-                                ovmax = ov
-                                gt_match = obj
-
-                if self.specific_iou_flagged:
-                    if class_name in self.specific_iou_classes:
-                        self.min_overlap = self.specific_iou_classes[class_name]
-                if ovmax >= self.min_overlap:
-                    if "difficult" not in gt_match:  # 标记当前的框已经匹配过
-                        if not bool(gt_match["used"]):  # true positive
-                            tp[idx] = 1
-                            gt_match["used"] = True
-                            count_true_positives[class_name] += 1
-                            # update the ".json" file
-                            with open(gt_file, 'w') as f:
-                                f.write(json.dumps(ground_truth_data))
-                        else:  # false positive (multiple detection)
-                            fp[idx] = 1
-                else:  # false positive
-                    fp[idx] = 1
-
-            # compute precision/recall
-            pr_val[class_name] = [0, 0]
-            if len(fp) > 0:
-                cumsum = 0
-                for i, val in enumerate(fp):
-                    fp[i] += cumsum
-                    cumsum += val
-
-            if len(tp) > 0:
-                cumsum = 0
-                for i, val in enumerate(tp):
-                    tp[i] += cumsum
-                    cumsum += val
-                rec = tp[:]
-                for i, val in enumerate(tp):
-                    rec[i] = float(tp[i]) / (gt_counter_per_class[class_name] + 1e-10)
-                pr_val[class_name][1] = np.mean(rec)
-
-                if len(fp) > 0:
-                    prec = tp[:]
-                    for i, val in enumerate(tp):
-                        prec[i] = float(tp[i]) / (fp[i] + tp[i])
-                    ap, mrec, mprec = calc.voc_ap(rec[:], prec[:])
-                    sum_ap += ap
-                    ap_dictionary[class_name] = ap
-                    pr_val[class_name][0] = np.mean(prec)
-        return pr_val
 
     def get_model(self):
         """ 加载模型 """
@@ -913,66 +734,34 @@ class CalcMAP:
 
 
 if __name__ == '__main__':
-    c = {'full_transparent_trash_bag': 0, 'full_black_trash_bag': 0, 'full_red_trash_bag': 0,
-         'full_white_trash_bag': 0, 'full_blue_trash_bag': 0,
-         'hz_in_full_red_trash_bag': 0, 'hz_in_full_purple_trash_bag': 0, 'hz_in_full_blue_trash_bag': 0,
-         'hz_in_full_green_trash_bag': 0, 'full_transparent_bubble_bag': 0, 'full_green_trash_bag': 0,
-         'hz_in_full_white_trash_bag': 0, 'hz_in_full_transparent_trash_bag': 0,
-         'hz_in_full_black_trash_bag': 0, 'full_purple_trash_bag': 0, 'full_yellow_trash_bag': 0,
-         'hz_in_full_yellow_trash_bag': 0, 'hz_in_full_transparent_bubble_bag': 0,
-         'plastic_bag': 1, 'hz_in_plastic_bag': 1,
-         'napkin': 2, 'hz_in_napkin': 2,
-         'hz_in_color_paper_box': 3, 'color_paper_box': 3,
-         'kraft_paper_box': 4, 'hz_in_kraft_paper_box': 4,
-         'plastic_bottle': 5, 'hz_in_plastic_bottle': 5,
-         'can': 6, 'hz_in_can': 6,
-         }
-    b = {"full_trash_bag": 0, 'full-trash-bag': 0,
-         "plastic-bag": 1,
-         "napkin": 2,
-         "color-packing": 3,
-         'bottle': 5,
-         'can': 6}
-    a = {"full-trash-bag": 0, 'full_trash_bag': 0,
-         "HONGSELJB": 0, "HUANGSELJB": 0, "LANSELJB": 0, "ZSLJB": 0, "LVSELJB": 0,
-         'full_blue_trash_bag': 0, "hz_in_full_yellow_trash_bag": 0,
-         'full_transparent_trash_bag': 0,
-         'hz_in_full_black_trash_bag': 0,
-         'hz_in_full_blue_trash_bag': 0,
-         'full_red_trash_bag': 0,
-         "hz_in_full_transparent_trash_bag": 0,
-         'full_green_trash_bag': 0,
-         'full_yellow_trash_bag': 0,
-         'full_transparent_bubble_bag': 0,
-         'hz_in_full_red_trash_bag': 0,
-         'hz_in_full_white_trash_bag': 0,
-         'full_purple_trash_bag': 0,
-         'full_white_trash_bag': 0,
-         'full_black_trash_bag': 0,
-         'plastic-bag': 1, 'plastic_bag': 1, "hz_in_plastic_bag": 1,
-         'napkin': 2, "hz_in_napkin": 2,
-         'color-packing': 3, 'color_paper_box': 3, "hz_in_color_paper_box": 3,
-         'kraft': 4, "NPZH": 4, 'kraft_paper_box': 4, 'hz_in_kraft_paper_box': 4,
-         'bottle': 5, "SLP": 5, 'plastic_bottle': 5,
-         'can': 6, 'YLG': 6, 'hz_in_can': 6}
+    label2idx = {'full-trash-bag': 0, 'full_trash_bag': 0, 'HONGSELJB': 0, 'HUANGSELJB': 0, 'LANSELJB': 0, 'ZSLJB': 0,
+                 'LVSELJB': 0, 'full_blue_trash_bag': 0, 'hz_in_full_yellow_trash_bag': 0,
+                 'full_transparent_trash_bag': 0, 'hz_in_full_black_trash_bag': 0, 'hz_in_full_blue_trash_bag': 0,
+                 'full_red_trash_bag': 0, 'hz_in_full_transparent_trash_bag': 0, 'full_green_trash_bag': 0,
+                 'full_yellow_trash_bag': 0, 'full_transparent_bubble_bag': 0, 'hz_in_full_red_trash_bag': 0,
+                 'hz_in_full_white_trash_bag': 0, 'full_purple_trash_bag': 0, 'full_white_trash_bag': 0,
+                 'full_black_trash_bag': 0, 'plastic-bag': 1, 'plastic_bag': 1, 'hz_in_plastic_bag': 1, 'napkin': 2,
+                 'hz_in_napkin': 2, 'color-packing': 3, 'color_paper_box': 3, 'hz_in_color_paper_box': 3, 'kraft': 4,
+                 'NPZH': 4, 'kraft_paper_box': 4, 'hz_in_kraft_paper_box': 4, 'bottle': 5, 'SLP': 5,
+                 'plastic_bottle': 5, 'can': 6, 'YLG': 6, 'hz_in_can': 6, 'hz_in_full_purple_trash_bag': 0,
+                 'hz_in_full_green_trash_bag': 0, 'hz_in_full_transparent_bubble_bag': 0, 'hz_in_plastic_bottle': 5}
     WEIGHT_PATH = r'D:\Vortex\Project_7_huzhou\weights\waste_trash_device1280_v1.31.pt'  # 模型权重路径
     LABEL_FILE = r'D:\Vortex\SELF\cvmodule\Detection\yolov5\data\label.txt'  # 标签
     predict_root = r'C:\Users\yuhe\Desktop\valid_data\predict\ori_pred\0902-1'  # 模型预测的文件位置
     DATA_DIRS = [r'C:\Users\yuhe\Desktop\valid_data\2',
                  r'C:\Users\yuhe\Desktop\valid_data\1',
-                 r'C:\Users\yuhe\Desktop\valid_data\3',
+                 r'C:\Users\yuhe\Desktop\valid_data\3'
                  ]  # 数据集的路径
-    for _ in range(3):
-        predict_root = str(predict_root)
-        PRED_DIRS = [r'1', r'2', r'3']
-        for p in range(len(DATA_DIRS)):
-            DATA_DIR = DATA_DIRS[p]
-            PRED_DIR = os.path.join(predict_root, PRED_DIRS[p])
-            print(DATA_DIR, PRED_DIR)
-            calc_map = CalcMAP(WEIGHT_PATH, LABEL_FILE, (960, 960), DATA_DIR,
-                               need_pred=False, int_label=True, label_to_idx=a,
-                               root_dir=r'C:\Users\yuhe\Desktop\valid_data\predict',
-                               pred_dir=PRED_DIR, total_categories=7,
-                               idx2label={0: 'full_trash_bag', 1: 'plastic', 2: 'napkin',
-                                          3: 'color-packing', 4: 'kraft', 5: 'bottle', 6: 'can'})
-            calc_map.calculate()
+    predict_root = str(predict_root)
+    PRED_DIRS = [r'1', r'2', r'3']
+    for p in range(len(DATA_DIRS)):
+        DATA_DIR = DATA_DIRS[p]
+        PRED_DIR = os.path.join(predict_root, PRED_DIRS[p])
+        print(DATA_DIR, PRED_DIR)
+        calc_map = CalcMAP(WEIGHT_PATH, LABEL_FILE, (960, 960), DATA_DIR,
+                           need_pred=False, int_label=True, label_to_idx=label2idx,
+                           root_dir=r'C:\Users\yuhe\Desktop\valid_data\predict',
+                           pred_dir=PRED_DIR, total_categories=7,
+                           idx2label={0: 'full_trash_bag', 1: 'plastic', 2: 'napkin',
+                                      3: 'color-packing', 4: 'kraft', 5: 'bottle', 6: 'can'})
+        calc_map.calculate()
