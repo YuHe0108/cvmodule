@@ -1,6 +1,7 @@
 import os
 import cv2
 import sys
+import tqdm
 import pathlib
 import matplotlib.pyplot as plt
 from collections import defaultdict
@@ -19,9 +20,10 @@ def calc(pred_path, target_path, img_path, save_dir, iou_threshold=0.5):
     img_path:       图像存放的位置
     iou_threshold:  预测和真值的iou超过 0.5 认为匹配成功
     """
-    save_negative_samples_path = os.path.join(save_dir, 'res/NegativeSamples')
+    save_negative_samples_path = os.path.join(save_dir, 'NegativeSamples')
     check_path([save_negative_samples_path])
     if not os.path.exists(pred_path) or not os.path.exists(target_path):
+        print(f'not exist: {pred_path} or {target_path}')
         return
     with open(pred_path, 'r') as file:
         lines = file.readlines()
@@ -80,8 +82,8 @@ def calc(pred_path, target_path, img_path, save_dir, iou_threshold=0.5):
 
 
 def run(pred_dir, target_dir, img_dir, save_dir):
-    img_suffix = ['.jpg', '.jpeg', '.png', 'JPG']
-    for path in pathlib.Path(target_dir).iterdir():  # 寻找标签txt目录下的文件
+    img_suffix = ['.jpg', '.jpeg', '.png', '.JPG']
+    for path in tqdm.tqdm(pathlib.Path(target_dir).iterdir()):  # 寻找标签txt目录下的文件
         if path.suffix == '.txt':
             pred_txt_path = os.path.join(pred_dir, path.name)
             stem = path.stem
@@ -90,13 +92,16 @@ def run(pred_dir, target_dir, img_dir, save_dir):
                 img_path = os.path.join(img_dir, f'{stem}{suffix}')
                 if os.path.exists(img_path):
                     break
-            if img_path is not None:
-                calc(pred_txt_path, str(path), img_path, save_dir)
+            try:
+                if img_path is not None:
+                    calc(pred_txt_path, str(path), img_path, save_dir)
+            except Exception as e:
+                print(img_path, stem, path, e)
     return
 
 
 if __name__ == '__main__':
-    run(r"C:\Users\yuhe\Desktop\valid_data\predict\ori_pred\0919\2",
-        r"C:\Users\yuhe\Desktop\valid_data\1",
-        r'C:\Users\yuhe\Desktop\valid_data\1',
+    run(r"C:\Users\yuhe\Desktop\valid_data\predict\ori_pred\0919\3",
+        r"C:\Users\yuhe\Desktop\valid_data\3",
+        r'C:\Users\yuhe\Desktop\valid_data\3',
         save_dir=r'C:\Users\yuhe\Desktop\draw')
