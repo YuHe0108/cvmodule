@@ -101,7 +101,8 @@ def run(pred_dir, target_dir, img_dir, save_dir):
 
 
 if __name__ == '__main__':
-    run(r"C:\Users\yuhe\Desktop\valid_data\predict\ori_pred\0919\3",
-        r"C:\Users\yuhe\Desktop\valid_data\3",
-        r'C:\Users\yuhe\Desktop\valid_data\3',
+    target_file = "3"
+    run(fr"C:\Users\yuhe\Desktop\valid_data\predict\ori_pred\0902-1\{target_file}",
+        fr"C:\Users\yuhe\Desktop\valid_data\{target_file}",
+        fr'C:\Users\yuhe\Desktop\valid_data\{target_file}',
         save_dir=r'C:\Users\yuhe\Desktop\draw')
