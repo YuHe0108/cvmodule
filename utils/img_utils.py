@@ -1,15 +1,16 @@
 import numpy as np
 import cv2
 
-labels = ['full-trash-bag',
-          'plastic-bag',
-          'napkin',
-          'color-packing',
-          'kraft',
-          'bottle',
-          'can',
-          'other']
-int_2_label = {i: label for i, label in enumerate(labels)}
+
+# labels = ['full-trash-bag',
+#           'plastic-bag',
+#           'napkin',
+#           'color-packing',
+#           'kraft',
+#           'bottle',
+#           'can',
+#           'other']
+# int_2_label = {i: label for i, label in enumerate(labels)}
 
 
 def image_process(img, value_range, input_format='channel_first'):
@@ -47,7 +48,7 @@ def letterbox(im, new_shape=(640, 640), color=(0, 0, 0)):
     return im
 
 
-def draw_img(img, box, color, suffix=''):
+def draw_img(img, box, color, int_2_label, suffix=''):
     for x1, y1, x2, y2, cls in box:
         cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
         if color == (0, 0, 255):
@@ -69,5 +70,5 @@ if __name__ == '__main__':
         x2 = x + int(w * img_w)
         y2 = y + int(h * img_h)
         cv2.rectangle(img, (x, y), (x2, y2), (0, 0, 255), 2)
-    cv2.imshow('img',img)
+    cv2.imshow('img', img)
     cv2.waitKey(0)
