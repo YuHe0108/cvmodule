@@ -43,25 +43,25 @@ def calc(pred_path, target_path, img_path, save_dir, iou_threshold=0.5):
     target_box = []
     seen = set()
     iou_count = {i: [-1, -1] for i in range(len(targ_res))}
+
     for i, p_info in enumerate(pred_res):
         p_cls, _, p_x1, p_y1, p_x2, p_y2 = [eval(x) for x in p_info.split(' ')]
+        predict_box.append([p_x1, p_y1, p_x2, p_y2, p_cls])
         if int(p_cls) not in USEFUL_CLASS_IDX:
             continue
-        predict_box.append([p_x1, p_y1, p_x2, p_y2, p_cls])
         max_iou = -float('inf')
         correspond_cls = -1
 
         for j, t_info in enumerate(targ_res):
             t_cls, t_x1, t_y1, t_x2, t_y2 = [int(x) for x in t_info.split(' ')]
-            if int(t_cls) not in USEFUL_CLASS_IDX:
-                continue
-
             if j not in seen:  # 避免重复添加
                 seen.add(j)
                 target_box.append([t_x1, t_y1, t_x2, t_y2, t_cls])
-            cur_iou = calc_iou([t_x1, t_y1, t_x2, t_y2], [p_x1, p_y1, p_x2, p_y2])
             if t_cls != p_cls:  # 保证类别一致
                 continue
+            if int(t_cls) not in USEFUL_CLASS_IDX:  # 过滤不需要的类别
+                continue
+            cur_iou = calc_iou([t_x1, t_y1, t_x2, t_y2], [p_x1, p_y1, p_x2, p_y2])
             if cur_iou > max_iou and cur_iou > iou_threshold:
                 max_iou = cur_iou
                 correspond_cls = j  # 最大的 iou 对应匹配真值的索引
@@ -88,7 +88,8 @@ def calc(pred_path, target_path, img_path, save_dir, iou_threshold=0.5):
                 can_write = True
                 img = draw_img(img, [target_box[i]], (0, 0, 255), INT_TO_LABEL, 'R')
     if can_write:
-        cv2.imwrite(os.path.join(save_negative_samples_path, img_name), img)
+        # cv2.imwrite(os.path.join(save_negative_samples_path, img_name), img)
+        plt.imsave(os.path.join(save_negative_samples_path, img_name), cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
     return
 
 
@@ -123,8 +124,8 @@ def run(pred_dir, target_dir, img_dir, save_dir, label_txt):
 
 if __name__ == '__main__':
     target_file = "3"
-    run(fr"C:\Users\yuhe\Desktop\valid_data\predict\ori_pred\0902-1\{target_file}",
-        fr"C:\Users\yuhe\Desktop\valid_data\{target_file}",
-        fr'C:\Users\yuhe\Desktop\valid_data\{target_file}',
+    run(fr"C:\Users\yuhe\Desktop\pure_shenzhen\labels",
+        fr"C:\Users\yuhe\Desktop\shenzhen_val_data",
+        fr'C:\Users\yuhe\Desktop\shenzhen_val_data',
         save_dir=r'C:\Users\yuhe\Desktop\draw',
-        label_txt=r'C:\Users\yuhe\Desktop\valid_data\label.txt')
+        label_txt=r'./Detection/recyclable.txt')

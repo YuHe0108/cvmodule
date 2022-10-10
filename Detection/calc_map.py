@@ -60,9 +60,6 @@ class CalcMAP:
         self.img_dir = img_dir
         self.data_dir = data_dir
         self.label_file = label_file
-        self.input_shape = img_shape
-        self.weight_path = weight_path
-
         self.cover_detect_results = True  # 已经存在的预测结果是否覆盖
 
         self.root_dir = 'run_map_results' if root_dir is None else root_dir  # 将 预测结果、计算 map 产生的结果统一存放的路径
@@ -79,13 +76,11 @@ class CalcMAP:
 
         self.min_overlap = 0.5
         self.min_score_thresh = 0.5  # 置信度大于该值时，认为是目标
-
+        self.input_shape = img_shape
+        self.weight_path = weight_path
         self.total_categories = total_categories  # 一共有多少类别
-
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-        self.model = None
-        if need_pred:
-            self.model = self.get_model()
+        self.model = self.get_model() if need_pred else None
         self.idx2label = self.read_label() if idx2label is None else idx2label  # 标签名称
         self.label2idx = label_to_idx
         if label_to_idx is None:
@@ -743,13 +738,14 @@ if __name__ == '__main__':
                  'full_black_trash_bag': 0, 'plastic-bag': 1, 'plastic_bag': 1, 'hz_in_plastic_bag': 1, 'napkin': 2,
                  'hz_in_napkin': 2, 'color-packing': 3, 'color_paper_box': 3, 'hz_in_color_paper_box': 3, 'kraft': 4,
                  'NPZH': 4, 'kraft_paper_box': 4, 'hz_in_kraft_paper_box': 4, 'bottle': 5, 'SLP': 5,
+                 'glass-bottle': 5, 'glass_bottle': 5,
                  'plastic_bottle': 5, 'can': 6, 'YLG': 6, 'hz_in_can': 6, 'hz_in_full_purple_trash_bag': 0,
                  'hz_in_full_green_trash_bag': 0, 'hz_in_full_transparent_bubble_bag': 0, 'hz_in_plastic_bottle': 5}
     WEIGHT_PATH = r'D:\Vortex\Project_7_huzhou\weights\waste_trash_device1280_v1.31.pt'  # 模型权重路径
     LABEL_FILE = r'D:\Vortex\SELF\cvmodule\Detection\yolov5\data\label.txt'  # 标签
     predict_root = r'C:\Users\yuhe\Desktop\valid_data\predict\ori_pred\0902-1'  # 模型预测的文件位置
-    DATA_DIRS = [r'C:\Users\yuhe\Desktop\valid_data\2',
-                 r'C:\Users\yuhe\Desktop\valid_data\1',
+    DATA_DIRS = [r'C:\Users\yuhe\Desktop\valid_data\1',
+                 r'C:\Users\yuhe\Desktop\valid_data\2',
                  r'C:\Users\yuhe\Desktop\valid_data\3'
                  ]  # 数据集的路径
     predict_root = str(predict_root)

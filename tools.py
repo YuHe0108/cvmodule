@@ -321,6 +321,12 @@ def calc_total_file_cnt(path):
     return cnt
 
 
+def output_file_name(root):
+    for path in pathlib.Path(root).iterdir():
+        print(path.stem)
+    return
+
+
 if __name__ == '__main__':
     # import test_data
     #
@@ -342,5 +348,6 @@ if __name__ == '__main__':
     # print(return_result_)
     # print(len(return_result_))
     # norm_file_name(r'J:\DATA\ObjDet\COCO\COCO_2017train_zip')
-    reverse_file_name(r'J:\DATA\ObjDet\COCO\COCO_2017train_zip')
-    pass
+    # reverse_file_name(r'J:\DATA\ObjDet\COCO\COCO_2017train_zip')
+    # pass
+    output_file_name(r'C:\Users\yuhe\Desktop\fenjiantai_error_yh(1)\fenjiantai_error_yh')

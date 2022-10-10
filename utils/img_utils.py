@@ -2,17 +2,6 @@ import numpy as np
 import cv2
 
 
-# labels = ['full-trash-bag',
-#           'plastic-bag',
-#           'napkin',
-#           'color-packing',
-#           'kraft',
-#           'bottle',
-#           'can',
-#           'other']
-# int_2_label = {i: label for i, label in enumerate(labels)}
-
-
 def image_process(img, value_range, input_format='channel_first'):
     """ 将图像归一化至 01（-1, 1）之间，并转换 HWC ~ CHW, 增加维度： BCHW"""
     inputs = img.astype(np.float32)
@@ -52,23 +41,24 @@ def draw_img(img, box, color, int_2_label, suffix=''):
     for x1, y1, x2, y2, cls in box:
         cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
         if color == (0, 0, 255):
-            cv2.putText(img, int_2_label[int(cls)] + "-" + suffix, (x1, y1),
-                        cv2.FONT_HERSHEY_PLAIN, 2, color, 2)
+            cv2.putText(img, int_2_label[int(cls)] + "-" + suffix,
+                        (x1, y1 + 15), cv2.FONT_HERSHEY_PLAIN, 2, color, 2)
         else:
-            cv2.putText(img, int_2_label[int(cls)] + "-" + suffix, (x2, y2),
-                        cv2.FONT_HERSHEY_PLAIN, 2, color, 2)
+            cv2.putText(img, int_2_label[int(cls)] + "-" + suffix,
+                        (x1, y2 - 15), cv2.FONT_HERSHEY_PLAIN, 2, color, 2)
     return img
 
 
 if __name__ == '__main__':
-    img = cv2.imread(r'D:\Download\5.jpg')
-    img_h, img_w = img.shape[:2]
-    box = [[0.7528735632183908, 0.3911290322580645, 0.09051724137931035, 0.3870967741935484]]
-    for x, y, w, h in box:
-        x = int(x * img_w)
-        y = int(y * img_h)
-        x2 = x + int(w * img_w)
-        y2 = y + int(h * img_h)
-        cv2.rectangle(img, (x, y), (x2, y2), (0, 0, 255), 2)
-    cv2.imshow('img', img)
-    cv2.waitKey(0)
+    # img = cv2.imread(r'D:\Download\5.jpg')
+    # img_h, img_w = img.shape[:2]
+    # box = [[0.7528735632183908, 0.3911290322580645, 0.09051724137931035, 0.3870967741935484]]
+    # for x, y, w, h in box:
+    #     x = int(x * img_w)
+    #     y = int(y * img_h)
+    #     x2 = x + int(w * img_w)
+    #     y2 = y + int(h * img_h)
+    #     cv2.rectangle(img, (x, y), (x2, y2), (0, 0, 255), 2)
+    # cv2.imshow('img', img)
+    # cv2.waitKey(0)
+    pass
