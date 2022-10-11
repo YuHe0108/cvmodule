@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import cv2 as cv
+import argparse
 import pathlib
 import torch
 import json
@@ -37,9 +38,7 @@ class CalcMAP:
                  int_label=False,
                  label_to_idx=None,
                  root_dir=None,
-                 pred_dir=None,
-                 total_categories=None,
-                 idx2label=None):
+                 pred_dir=None):
         """
         img_shape:      测试 resize 图像尺寸
         label_file:     标签文件，txt 格式即可
@@ -61,6 +60,7 @@ class CalcMAP:
         self.data_dir = data_dir
         self.label_file = label_file
         self.cover_detect_results = True  # 已经存在的预测结果是否覆盖
+        self.img_suffix = {'.jpg', '.jpeg', '.JPG', '.JPEG', '.png'}  # 数据集图像的 后缀有哪些
 
         self.root_dir = 'run_map_results' if root_dir is None else root_dir  # 将 预测结果、计算 map 产生的结果统一存放的路径
         self.pred_dir = None  # 预测结果 txt 文件的保存位置
@@ -78,15 +78,15 @@ class CalcMAP:
         self.min_score_thresh = 0.5  # 置信度大于该值时，认为是目标
         self.input_shape = img_shape
         self.weight_path = weight_path
-        self.total_categories = total_categories  # 一共有多少类别
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         self.model = self.get_model() if need_pred else None
-        self.idx2label = self.read_label() if idx2label is None else idx2label  # 标签名称
-        self.label2idx = label_to_idx
+
+        self.idx2label = self.read_label()  # int->标签名称
+        self.total_categories = len(self.idx2label)  # 一共有多少类别
+        self.label2idx = label_to_idx  # 将 xml 文件中的 标签-> int
         if label_to_idx is None:
             self.label2idx = {label: i for i, label in self.idx2label.items()}
         self.ignore_labels = set()  # 哪些类不参与 map 计算，自行添加
-        self.img_suffix = {'.jpg', '.jpeg', '.JPG', '.JPEG', '.png'}  # 数据集图像的 后缀有哪些
 
         self.need_pred = need_pred
         self.int_label = int_label
@@ -146,7 +146,7 @@ class CalcMAP:
             if img_file.suffix not in self.img_suffix:
                 continue
             img_name = pathlib.Path(img_file).stem  # 预测图像的名字
-            # 允许覆盖，并且预测的 txt 结果已经存在，则不在重复计算
+            # 不允许覆盖，并且预测的 txt 结果已经存在，则不在重复计算
             if not self.cover_detect_results and os.path.exists(os.path.join(self.pred_dir, "{}.txt".format(img_name))):
                 continue
             inputs, ori_img = self.read_img(str(img_file))  # 读取图像
@@ -501,7 +501,8 @@ class CalcMAP:
              "tp": true_positives, "fp": false_positives, "fn": false_negatives,
              'precision': precisions, "recall": recalls,
              'ap': [ap_dictionary.get(str(i), 0) for i in range(self.total_categories)],
-             'mean_ap': [mean_ap] + [0 for _ in range(self.total_categories - 1)]})
+             'mean_ap': [mean_ap] + [0 for _ in range(self.total_categories - 1)],
+             'weight_map': [weight_mean_ap] + [0 for _ in range(self.total_categories - 1)]})
         if ori_data is not None:
             df = pd.DataFrame([[''] * len(df.columns)], columns=df.columns).append(df)
             df = ori_data.append(df)
@@ -728,36 +729,57 @@ class CalcMAP:
         return
 
 
-if __name__ == '__main__':
-    label2idx = {'full-trash-bag': 0, 'full_trash_bag': 0, 'HONGSELJB': 0, 'HUANGSELJB': 0, 'LANSELJB': 0, 'ZSLJB': 0,
-                 'LVSELJB': 0, 'full_blue_trash_bag': 0, 'hz_in_full_yellow_trash_bag': 0,
-                 'full_transparent_trash_bag': 0, 'hz_in_full_black_trash_bag': 0, 'hz_in_full_blue_trash_bag': 0,
-                 'full_red_trash_bag': 0, 'hz_in_full_transparent_trash_bag': 0, 'full_green_trash_bag': 0,
-                 'full_yellow_trash_bag': 0, 'full_transparent_bubble_bag': 0, 'hz_in_full_red_trash_bag': 0,
-                 'hz_in_full_white_trash_bag': 0, 'full_purple_trash_bag': 0, 'full_white_trash_bag': 0,
-                 'full_black_trash_bag': 0, 'plastic-bag': 1, 'plastic_bag': 1, 'hz_in_plastic_bag': 1, 'napkin': 2,
-                 'hz_in_napkin': 2, 'color-packing': 3, 'color_paper_box': 3, 'hz_in_color_paper_box': 3, 'kraft': 4,
-                 'NPZH': 4, 'kraft_paper_box': 4, 'hz_in_kraft_paper_box': 4, 'bottle': 5, 'SLP': 5,
-                 'glass-bottle': 5, 'glass_bottle': 5,
-                 'plastic_bottle': 5, 'can': 6, 'YLG': 6, 'hz_in_can': 6, 'hz_in_full_purple_trash_bag': 0,
-                 'hz_in_full_green_trash_bag': 0, 'hz_in_full_transparent_bubble_bag': 0, 'hz_in_plastic_bottle': 5}
-    WEIGHT_PATH = r'D:\Vortex\Project_7_huzhou\weights\waste_trash_device1280_v1.31.pt'  # 模型权重路径
-    LABEL_FILE = r'D:\Vortex\SELF\cvmodule\Detection\yolov5\data\label.txt'  # 标签
-    predict_root = r'C:\Users\yuhe\Desktop\valid_data\predict\ori_pred\0902-1'  # 模型预测的文件位置
-    DATA_DIRS = [r'C:\Users\yuhe\Desktop\valid_data\1',
-                 r'C:\Users\yuhe\Desktop\valid_data\2',
-                 r'C:\Users\yuhe\Desktop\valid_data\3'
-                 ]  # 数据集的路径
-    predict_root = str(predict_root)
-    PRED_DIRS = [r'1', r'2', r'3']
-    for p in range(len(DATA_DIRS)):
-        DATA_DIR = DATA_DIRS[p]
-        PRED_DIR = os.path.join(predict_root, PRED_DIRS[p])
+def parse_opt(known=False):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--name2int', type=str, help='转换xml->txt的时候, 类别str->int',
+                        default='huzhou.json')  # 模型权重的选择
+    parser.add_argument('--int2name', type=str, help='将 int-> str, 转换为类别标签',
+                        default=r'huzhou.txt')
+
+    parser.add_argument('--save_dir', type=str, help='结果的保存路径',
+                        default=r'C:\Users\yuhe\Desktop\valid_data\predict')
+    parser.add_argument('--pred_dir', type=str, help='模型预测结果的路径',
+                        default=r'C:\Users\yuhe\Desktop\valid_data\predict\ori_pred\0902-1')
+    parser.add_argument('--data_dir', type=str, help='数据标签数据的路径',
+                        default=r'C:\Users\yuhe\Desktop\valid_data')
+    parser.add_argument('--weight_path', type=str, help='模型预测所用的权重路径',
+                        default=r'D:\Vortex\Project_7_huzhou\weights\waste_trash_device1280_v1.31.pt')  # 模型的配置文件
+    parser.add_argument('--file_names', type=list, help='预测结果是否是含有多个文件夹',
+                        default=[1, 2, 3])
+
+    parser.add_argument('--int_label', type=bool, help='xml->txt 转换的过程中, 保存的cls是否为int',
+                        default=True)
+    parser.add_argument('--need_pred', type=bool, help='是否需要模型预测结果',
+                        default=False)
+    parser.add_argument('--batch_size', type=list, help='模型预测时的图像大小',
+                        default=[960, 960])
+    opt = parser.parse_known_args()[0] if known else parser.parse_args()
+    return opt
+
+
+def run():
+    options = parse_opt()
+    with open(options.name2int) as file:
+        label2idx = json.load(file)  # 加载标签的名字, 将 xml 文件转换为 txt 文件
+
+    # 逐个文件夹计算
+    file_names = options.file_names
+    for file_name in file_names:
+        PRED_DIR = os.path.join(options.pred_dir, str(file_name))
+        DATA_DIR = os.path.join(options.data_dir, str(file_name))
         print(DATA_DIR, PRED_DIR)
-        calc_map = CalcMAP(WEIGHT_PATH, LABEL_FILE, (960, 960), DATA_DIR,
-                           need_pred=False, int_label=True, label_to_idx=label2idx,
-                           root_dir=r'C:\Users\yuhe\Desktop\valid_data\predict',
-                           pred_dir=PRED_DIR, total_categories=7,
-                           idx2label={0: 'full_trash_bag', 1: 'plastic', 2: 'napkin',
-                                      3: 'color-packing', 4: 'kraft', 5: 'bottle', 6: 'can'})
+        calc_map = CalcMAP(options.weight_path,
+                           options.int2name,
+                           options.batch_size,
+                           DATA_DIR,
+                           need_pred=options.need_pred,
+                           int_label=options.int_label,
+                           label_to_idx=label2idx,
+                           root_dir=options.save_dir,
+                           pred_dir=PRED_DIR)
         calc_map.calculate()
+    return
+
+
+if __name__ == '__main__':
+    run()

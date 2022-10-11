@@ -88,7 +88,6 @@ def calc(pred_path, target_path, img_path, save_dir, iou_threshold=0.5):
                 can_write = True
                 img = draw_img(img, [target_box[i]], (0, 0, 255), INT_TO_LABEL, 'R')
     if can_write:
-        # cv2.imwrite(os.path.join(save_negative_samples_path, img_name), img)
         plt.imsave(os.path.join(save_negative_samples_path, img_name), cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
     return
 
@@ -124,8 +123,8 @@ def run(pred_dir, target_dir, img_dir, save_dir, label_txt):
 
 if __name__ == '__main__':
     target_file = "3"
-    run(fr"C:\Users\yuhe\Desktop\pure_shenzhen\labels",
-        fr"C:\Users\yuhe\Desktop\shenzhen_val_data",
-        fr'C:\Users\yuhe\Desktop\shenzhen_val_data',
+    run(fr"C:\Users\yuhe\Desktop\负样本分析\pure_shenzhen\labels",
+        fr"C:\Users\yuhe\Desktop\负样本分析\shenzhen_val_data",
+        fr'C:\Users\yuhe\Desktop\负样本分析\shenzhen_val_data',
         save_dir=r'C:\Users\yuhe\Desktop\draw',
         label_txt=r'./Detection/recyclable.txt')
