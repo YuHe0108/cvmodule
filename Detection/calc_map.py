@@ -739,13 +739,13 @@ def parse_opt(known=False):
     parser.add_argument('--save_dir', type=str, help='结果的保存路径',
                         default=r'C:\Users\yuhe\Desktop\valid_data\predict')
     parser.add_argument('--pred_dir', type=str, help='模型预测结果的路径',
-                        default=r'C:\Users\yuhe\Desktop\valid_data\predict\ori_pred\0902-1')
+                        default=r'C:\Users\yuhe\Desktop\valid_data\predict\ori_pred\0902-1\1')
     parser.add_argument('--data_dir', type=str, help='数据标签数据的路径',
-                        default=r'C:\Users\yuhe\Desktop\valid_data')
+                        default=r'C:\Users\yuhe\Desktop\valid_data\1')
     parser.add_argument('--weight_path', type=str, help='模型预测所用的权重路径',
                         default=r'D:\Vortex\Project_7_huzhou\weights\waste_trash_device1280_v1.31.pt')  # 模型的配置文件
     parser.add_argument('--file_names', type=list, help='预测结果是否是含有多个文件夹',
-                        default=[1, 2, 3])
+                        default=[])
 
     parser.add_argument('--int_label', type=bool, help='xml->txt 转换的过程中, 保存的cls是否为int',
                         default=True)
@@ -763,20 +763,28 @@ def run():
         label2idx = json.load(file)  # 加载标签的名字, 将 xml 文件转换为 txt 文件
 
     # 逐个文件夹计算
+    pred_dirs = []
+    data_dirs = []
     file_names = options.file_names
-    for file_name in file_names:
-        PRED_DIR = os.path.join(options.pred_dir, str(file_name))
-        DATA_DIR = os.path.join(options.data_dir, str(file_name))
-        print(DATA_DIR, PRED_DIR)
+    if len(file_names) == 0:
+        pred_dirs = [options.pred_dir]
+        data_dirs = [options.data_dir]
+    else:
+        for file_name in file_names:
+            pred_dirs.append(os.path.join(options.pred_dir, str(file_name)))
+            data_dirs.append(os.path.join(options.data_dir, str(file_name)))
+
+    for data_dir, pred_dir in zip(data_dirs, pred_dirs):
+        print(f"数据路径: {data_dir}, 预测路径: {pred_dir}")
         calc_map = CalcMAP(options.weight_path,
                            options.int2name,
                            options.batch_size,
-                           DATA_DIR,
+                           data_dir,
                            need_pred=options.need_pred,
                            int_label=options.int_label,
                            label_to_idx=label2idx,
                            root_dir=options.save_dir,
-                           pred_dir=PRED_DIR)
+                           pred_dir=pred_dir)
         calc_map.calculate()
     return
 
