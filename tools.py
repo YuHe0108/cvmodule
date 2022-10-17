@@ -322,9 +322,11 @@ def calc_total_file_cnt(path):
 
 
 def output_file_name(root):
+    names = []
     for path in pathlib.Path(root).iterdir():
+        names.append(path.stem)
         print(path.stem)
-    return
+    return names
 
 
 if __name__ == '__main__':
@@ -350,4 +352,16 @@ if __name__ == '__main__':
     # norm_file_name(r'J:\DATA\ObjDet\COCO\COCO_2017train_zip')
     # reverse_file_name(r'J:\DATA\ObjDet\COCO\COCO_2017train_zip')
     # pass
-    output_file_name(r'C:\Users\yuhe\Desktop\fenjiantai_error_yh(1)\fenjiantai_error_yh')
+    r = output_file_name(r'C:\Users\yuhe\Desktop\1016\NegativeSamples')
+    import matplotlib.pyplot as plt
+    import cv2
+
+    for n in r:
+        path = os.path.join(fr'C:\Users\yuhe\Desktop\1016\NegativeSamples\{n}.jpg')
+        img = plt.imread(path)
+        h, w = img.shape[:2]
+        h, w = int(h * 0.75), int(w * 0.75)
+        img = cv2.resize(img, (w, h))
+        cv2.imshow(n, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()

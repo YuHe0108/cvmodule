@@ -7,7 +7,7 @@ import tensorrt as trt
 TRT_LOGGER = trt.Logger(trt.Logger.INFO)
 
 
-def build_engine(onnx_file_path, engine_file_path):
+def build_engine(onnx_file_path, engine_file_path, input_shape):
     """将 onnx 权重转换为 trt 文件"""
     # 基于 INetworkDefinition 构建 ICudaEngine
     builder = trt.Builder(TRT_LOGGER)
@@ -35,7 +35,7 @@ def build_engine(onnx_file_path, engine_file_path):
                 print(parser.get_error(error))
             return None
             # 根据 yolov3.onnx，reshape 输入数据的形状
-    network.get_input(0).shape = [1, 3, 608, 608]
+    network.get_input(0).shape = [1, 3, input_shape[0], input_shape[1]]
     print("[INFO] Completed parsing of ONNX file.")
     print(f"[INFO] Building an engine from {onnx_file_path}.")
     # 序列化模型
@@ -47,3 +47,7 @@ def build_engine(onnx_file_path, engine_file_path):
     with open(engine_file_path, "wb") as f:
         f.write(plan)
     return engine
+
+
+if __name__ == "__main__":
+    build_engine("", "", "")

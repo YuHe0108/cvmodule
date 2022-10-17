@@ -8,8 +8,7 @@ from TensorRT.utils import processing_image, allocate_buffers, do_inference, get
 
 
 def run(trt_path, img_path):
-    # with open("left.trt", "rb") as f, trt.Runtime(logger) as runtime:
-    #     engine = runtime.deserialize_cuda_engine(f.read())
+    # 获取推理引擎
     engine = get_engine(trt_path)
     # 创建推理上下文
     context = engine.create_execution_context()

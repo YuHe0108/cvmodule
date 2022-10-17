@@ -6,8 +6,8 @@ import paho.mqtt.client as mqtt
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '..'))
 sys.path.append("..")
 
-REPORT_TOPIC = ['RoadWaste']  # 主题
-IP_ADDRESS = '127.0.0.1'
+REPORT_TOPIC = ['RoadWaste', "heart"]  # 主题
+IP_ADDRESS = '10.10.13.11'
 PORT = 1883
 
 
@@ -25,7 +25,7 @@ def on_message(client, userdata, msg):
 def server_connect(client):
     client.on_connect = on_connect  # 启用订阅模式
     client.on_message = on_message  # 接收消息
-    client.connect('10.10.10.190', 1883)  # 链接10
+    client.connect(IP_ADDRESS, PORT)  # 链接10
     client.loop_forever()  # 以forever方式阻塞运行。
 
 

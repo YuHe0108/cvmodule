@@ -14,8 +14,9 @@ class ONNXModel:
     def __init__(self, onnx_path):
         """
         :param onnx_path:
+        CUDAExecutionProvider
         """
-        self.onnx_session = onnxruntime.InferenceSession(onnx_path, providers=['CPUExecutionProvider'])  # 读取onnx模型权重
+        self.onnx_session = onnxruntime.InferenceSession(onnx_path, providers=['CUDAExecutionProvider'])  # 读取onnx模型权重
         self.input_name = self.get_input_name()
         self.output_name = self.get_output_name()
         print("input_name:{}".format(self.input_name))
@@ -74,7 +75,7 @@ def to_numpy(tensor):
     return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
 
 
-weights = r'C:\Users\yuhe\Desktop\efficient_lite2_left.onnx'
+weights = r'./efficient_left_1_8_1.onnx'
 
 to_tensor = transforms.ToTensor()
 
@@ -86,7 +87,7 @@ img = img.unsqueeze_(0)
 model = ONNXModel(weights)
 inputs = {model.get_input_name()[0]: to_numpy(img)}
 outputs = model.onnx_session.run(None, inputs)[0][0]  # 只有最后的 output 才是最终的输出值
-print(img.shape, outputs, np.exp(outputs))
+print(img.shape, outputs, np.exp(outputs), [round(x, 3) for x in np.exp(outputs)])
 for a in outputs:
     print(a.shape)
 
