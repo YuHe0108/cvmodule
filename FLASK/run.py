@@ -21,7 +21,7 @@ def create_app():
         return response
 
     # 注册路由
-    app.register_blueprint(ai_configuration, url_prefix='/ai_interface')
+    app.register_blueprint(ai_configuration, url_prefix='/AI_Interface')
 
     @app.route('/')
     def index():

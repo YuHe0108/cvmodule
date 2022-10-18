@@ -1,5 +1,6 @@
 from PIL import Image
 import numpy as np
+import requests
 import base64
 import cv2
 import io
@@ -61,6 +62,17 @@ def decode_image(encoding_image):
     return image
 
 
+def download_img(url, save_path):
+    headers_ = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers_, timeout=5, verify=False)
+    response.raise_for_status()
+    with open(save_path, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+    response.close()
+    return
+
+
 if __name__ == '__main__':
     # img = cv2.imread(r'D:\Download\5.jpg')
     # img_h, img_w = img.shape[:2]
@@ -73,4 +85,5 @@ if __name__ == '__main__':
     #     cv2.rectangle(img, (x, y), (x2, y2), (0, 0, 255), 2)
     # cv2.imshow('img', img)
     # cv2.waitKey(0)
-    pass
+    download_img("{}?id={}".format('http://222.92.212.123:8003/cloudFile/common/downloadFile?id= ', 'f5826deb4100493ca2248cf92d6bb8c7'),
+                 'test.jpg')
