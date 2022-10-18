@@ -1,5 +1,8 @@
+from PIL import Image
 import numpy as np
+import base64
 import cv2
+import io
 
 
 def image_process(img, value_range, input_format='channel_first'):
@@ -47,6 +50,15 @@ def draw_img(img, box, color, int_2_label, suffix=''):
             cv2.putText(img, int_2_label[int(cls)] + "-" + suffix,
                         (x1, y2 - 15), cv2.FONT_HERSHEY_PLAIN, 2, color, 2)
     return img
+
+
+def decode_image(encoding_image):
+    """通过 json 文件解析 image, 将 base64 转为 rgb"""
+    image = base64.b64decode(encoding_image)
+    image = Image.open(io.BytesIO(image))
+    image = image.convert("RGB")
+    image = np.array(image, dtype=np.uint8)  # 将图像转换为 array 形式
+    return image
 
 
 if __name__ == '__main__':
