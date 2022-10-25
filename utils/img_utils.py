@@ -19,6 +19,17 @@ def image_process(img, value_range, input_format='channel_first'):
     return np.expand_dims(inputs, 0)
 
 
+def join_img(img, shape):
+    """将图像通过拼接的方式增大图像尺寸"""
+    out = img
+    h, w = out.shape[:2]
+    ori_h, ori_w = img.shape[:2]
+    while h < shape[0] or w < shape[1]:
+        out = cv2.copyMakeBorder(out, ori_h, 0, ori_w, 0, cv2.BORDER_WRAP)
+        h, w = out.shape[:2]
+    return out[0:shape[0], 0:shape[1]]
+
+
 def letterbox(im, new_shape=(640, 640), color=(0, 0, 0)):
     """缩放图像尺寸至： new_shape"""
     # Resize and pad image while meeting stride-multiple constraints
