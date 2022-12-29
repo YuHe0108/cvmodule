@@ -25,7 +25,7 @@ coco_id_name_map = {1: 'person', 2: 'bicycle', 3: 'car', 4: 'motorcycle', 5: 'ai
                     82: 'refrigerator', 84: 'book', 85: 'clock', 86: 'vase', 87: 'scissors',
                     88: 'teddy bear', 89: 'hair drier', 90: 'toothbrush'}
 
-name2idx = {'dog': 0, 'cat': 1}
+name2idx = {'dog': 0, 'cat': 1, 'person': 3, 'car': 4, 'bus': 4, 'truck': 4, 'motorcycle': 5, 'umbrella': 6}
 
 
 def parse_data(json_path, img_root, save_txt_root, save_img_root, class_name):
@@ -54,8 +54,9 @@ def parse_data(json_path, img_root, save_txt_root, save_img_root, class_name):
         # cv2.imshow(f'img_{idx}', img)
         # cv2.waitKey(0)
         img_h, img_w = img.shape[:2]
-        x1, y1, w, h = x1 / img_w, y1 / img_h, w / img_w, h / img_h
-        record_info[img_id].append([idx, x1, y1, w, h])
+        # x1, y1, w, h = x1 / img_w, y1 / img_h, w / img_w, h / img_h
+        xc, yc, w, h = (x2 - x1) / 2 / img_w, (y2 - y1) / 2 / img_h, w / img_w, h / img_h
+        record_info[img_id].append([idx, xc, yc, w, h])
 
     # 写入到txt, 并复制图像
     for img_id, info in record_info.items():
@@ -72,3 +73,10 @@ def parse_data(json_path, img_root, save_txt_root, save_img_root, class_name):
         # 复制图像
         shutil.copy(os.path.join(img_root, f"{img_id}.jpg"), os.path.join(save_img_root, f"{img_id}.jpg"))
     return
+
+
+if __name__ == '__main__':
+    parse_data(json_path=r'/mnt/YuHe/data/SDYD/cat_dog/useful/coco/annotations_trainval2017/annotations/instances_train2017.json',
+               img_root=r'/mnt/YuHe/data/SDYD/cat_dog/useful/coco/train2017',
+               save_txt_root=r'/mnt/YuHe/data/SDYD/cat_dog/useful/coco/raw/txt',
+               save_img_root=r'/mnt/YuHe/data/SDYD/cat_dog/useful/coco/raw/images')
