@@ -148,14 +148,13 @@ def main(args):
         dataset_path = split_data
     else:
         dataset_path = conf.get("path")
-    print(dataset_path)
+    print("当前处理的数据集路径: ", dataset_path)
 
     raw_path = os.path.join(dataset_path, "raw")
     images_path = mkdir_and_get(os.path.join(dataset_path, "images"))
     lables_path = mkdir_and_get(os.path.join(dataset_path, "labels"))
 
     train_path = mkdir_and_get(os.path.join(dataset_path, conf.get("train")))
-
     print("train_path:{}".format(train_path))
 
     train_label_path = mkdir_and_get(train_path.replace("images/", "labels/"))
@@ -171,15 +170,12 @@ def main(args):
     for path, dir_list, file_list in os.walk(raw_path):
         print(path)
         for xml_file in file_list:
-
-            if not xml_file.endswith(".xml"):
-                # 不是xml 不处理
+            if not xml_file.endswith(".xml"):  # 不是xml 不处理
                 continue
             try:
                 tree = ET.parse(os.path.join(path, xml_file))
                 root = tree.getroot()
-                if len(root.findall('object')) == 0:
-                    # 没有标签不处理
+                if len(root.findall('object')) == 0:  # 没有标签不处理
                     # if random.randint(0,5) == 1:
                     xml_files.append(xml_file)
                     continue
