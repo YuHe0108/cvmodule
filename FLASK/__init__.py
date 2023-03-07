@@ -23,3 +23,14 @@
 # # for row in recs:
 # #     print(row, type(row))
 # conn.close()
+import rsa
+def make_key():
+    """
+    生成公钥和私钥
+    :return:
+    """
+    pub_key, pri_key = rsa.newkeys(1024)
+    pub_pkcs = pub_key.save_pkcs1()
+    pri_pkcs = pri_key.save_pkcs1()
+    print('pub_pkcs:\n' + pub_pkcs.decode())
+    print('pri_pkcs:\n' + pri_pkcs.decode())

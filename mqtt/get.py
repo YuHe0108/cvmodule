@@ -23,6 +23,7 @@ def on_message(client, userdata, msg):
 
 
 def server_connect(client):
+    client.username_pw_set("yuhe", '123')
     client.on_connect = on_connect  # 启用订阅模式
     client.on_message = on_message  # 接收消息
     client.connect(IP_ADDRESS, PORT)  # 链接10

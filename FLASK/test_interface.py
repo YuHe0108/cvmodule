@@ -20,13 +20,16 @@ img1 = s.decode('ascii')
 # tenant_id = "29b804d2ed9e45b88099e5bbd2076aa6"
 # headers = {'tenantId': tenant_id}
 # info = {"startimg": img1, 'endimg': img2}
-info = {"image": img1}
+info = {"image": 11}
 
 # inputs = {"download_url": 'http://222.92.212.123:8003/cloudFile/common/downloadFile',
 #           "file_name": '8e67d03eb132493db502d595ee390d0e',
 #           "save_name": '1'}
 t = time.time()
-response = requests.post('http://10.10.10.152:6666/AI_Interface/asynchronous_test', json=info, timeout=5)
+response = requests.post('http://10.10.13.11:6666/test', json=info, timeout=5)
+print(response.headers)
+print(response.apparent_encoding)
+print(response.status_code)
 print(time.time() - t)
-data_output = response.json()  # 数据获取成功
-print(data_output)
+# data_output = response.json()  # 数据获取成功
+# print(data_output)

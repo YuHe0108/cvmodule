@@ -48,7 +48,7 @@ def encrypt_data(message):
 
 def decry_data(encrypt_message):
     # B的私钥解密
-    with open('b_private.pem', 'r') as f:
+    with open('private.pem', 'r') as f:
         privkey = rsa.PrivateKey.load_pkcs1(f.read().encode())
     final_data = ''
     for index in encrypt_message:
@@ -57,7 +57,7 @@ def decry_data(encrypt_message):
         final_data = final_data + data
     print("解密后的明文:%s" % final_data)
     # A的公钥验签
-    with open('a_public.pem', 'r') as f:
+    with open('public.pem', 'r') as f:
         pubkey = rsa.PublicKey.load_pkcs1(f.read().encode())
     message = {}
     final_data = json.loads(final_data)
@@ -71,3 +71,4 @@ def decry_data(encrypt_message):
 
 if __name__ == '__main__':
     encrpt_data_ = encrypt_data('helloworld')
+    decry_data(encrpt_data_)

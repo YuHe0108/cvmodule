@@ -103,7 +103,7 @@ def asynchronous_test():
         cache_name = uuid.uuid1().hex
         plt.imsave(os.path.join(IMAGE_SAVE_DIR, f"{cache_name}.jpg"), image)
         DATA_BASE.insert_data("ai_interface",
-                              {"createTime": time.time(), "image": str(cache_name), "result": 22})
+                              {"createTime": time.time(), "image": str(cache_name), "result": [1, 2, 3, 4]})
         t1 = threading.Thread(target=process, args=())
         t1.start()
         # 将此记录在数据库中, 在结果列设置为0

@@ -51,3 +51,26 @@
 #         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 1)
 #         cv2.imshow('img', img)
 #         cv2.waitKey(0)
+# import torch
+# from Detection.yolov5.models.experimental import attempt_load
+#
+# model = attempt_load(r'D:\Vortex\SVN\湖州垃圾分类质量\20220902\0902_xj3.pt', map_location=torch.device('cpu'))
+# m = model.module.model[-1] if hasattr(model, 'module') else model.model[-1]
+# print(m.anchor_grid)
+import cv2
+
+
+def join_together(img, shape):
+    out = img
+    h, w = out.shape[:2]
+    ori_h, ori_w = img.shape[:2]
+    while w < shape[0] or w < shape[1]:
+        out = cv2.copyMakeBorder(out, ori_h, 0, ori_w, 0, cv2.BORDER_WRAP)
+        h, w = out.shape[:2]
+    return out[0:shape[0], 0:shape[1]]
+
+if __name__ == '__main__':
+    img = cv2.imread(r"C:\Users\yuhe\Desktop\1.png")
+    res = join_together(img, (1000, 1000))
+    cv2.imshow('img', res)
+    cv2.waitKey(0)
