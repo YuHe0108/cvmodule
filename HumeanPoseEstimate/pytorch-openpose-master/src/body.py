@@ -140,9 +140,9 @@ class Body(object):
                 connection = np.zeros((0, 5))
                 for c in range(len(connection_candidate)):
                     i, j, s = connection_candidate[c][0:3]
-                    if (i not in connection[:, 3] and j not in connection[:, 4]):
+                    if i not in connection[:, 3] and j not in connection[:, 4]:
                         connection = np.vstack([connection, [candA[i][3], candB[j][3], s, i, j]])
-                        if (len(connection) >= min(nA, nB)):
+                        if len(connection) >= min(nA, nB):
                             break
 
                 connection_all.append(connection)

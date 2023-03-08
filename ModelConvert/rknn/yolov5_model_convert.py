@@ -3,10 +3,10 @@ import cv2
 import numpy as np
 from rknn.api import RKNN
 
-ONNX_MODEL = r'D:\Vortex\SVN\湖州垃圾分类质量\20220902\0902.onnx'
-RKNN_MODEL = r'D:\Vortex\SVN\湖州垃圾分类质量\20220902\0902.rknn'
-IMG_PATH = r'C:\Users\yuhe\Desktop\rknn\1.jpg'
-DATASET = r'C:\Users\yuhe\Desktop\rknn\dataset.txt'
+ONNX_MODEL = r'D:\Vortex\SVN\猫狗\v1.0.onnx'
+RKNN_MODEL = r'D:\Vortex\SVN\猫狗\v1.0.rknn'
+IMG_PATH = r'D:\Vortex\SVN\猫狗\images\1.jpg'
+DATASET = r'D:\Vortex\SVN\猫狗\images\dataset.txt'
 
 QUANTIZE_ON = True
 

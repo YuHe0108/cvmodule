@@ -12,28 +12,25 @@ import torch.optim
 import torchvision.datasets as datasets
 
 import _init_paths
-from pose import Bar
-from pose.utils.logger import Logger, savefig
-from pose.utils.evaluation import accuracy, AverageMeter, final_preds
-from pose.utils.misc import save_checkpoint, save_pred, adjust_learning_rate
-from pose.utils.osutils import mkdir_p, isfile, isdir, join
-from pose.utils.imutils import batch_with_heatmap
-from pose.utils.transforms import fliplr, flip_back
-import pose.models as models
-import pose.datasets as datasets
-import pose.losses as losses
-
+from HumeanPoseEstimate.pytorch_pose.pose import Bar
+from HumeanPoseEstimate.pytorch_pose.pose.utils.logger import Logger, savefig
+from HumeanPoseEstimate.pytorch_pose.pose.utils.evaluation import accuracy, AverageMeter, final_preds
+from HumeanPoseEstimate.pytorch_pose.pose.utils.misc import save_checkpoint, save_pred, adjust_learning_rate
+from HumeanPoseEstimate.pytorch_pose.pose.utils.osutils import mkdir_p, isfile, isdir, join
+from HumeanPoseEstimate.pytorch_pose.pose.utils.imutils import batch_with_heatmap
+from HumeanPoseEstimate.pytorch_pose.pose.utils.transforms import fliplr, flip_back
+import HumeanPoseEstimate.pytorch_pose.pose.models as models
+import HumeanPoseEstimate.pytorch_pose.pose.datasets as datasets
+import HumeanPoseEstimate.pytorch_pose.pose.losses as losses
 
 # get model names and dataset names
 model_names = sorted(name for name in models.__dict__
-    if name.islower() and not name.startswith("__")
-    and callable(models.__dict__[name]))
-
+                     if name.islower() and not name.startswith("__")
+                     and callable(models.__dict__[name]))
 
 dataset_names = sorted(name for name in datasets.__dict__
-    if name.islower() and not name.startswith("__")
-    and callable(datasets.__dict__[name]))
-
+                       if name.islower() and not name.startswith("__")
+                       and callable(datasets.__dict__[name]))
 
 # init global variables
 best_acc = 0
@@ -42,7 +39,9 @@ idx = []
 # select proper device to run
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 cudnn.benchmark = True  # There is BN issue for early version of PyTorch
-                        # see https://github.com/bearpaw/pytorch-pose/issues/33
+
+
+# see https://github.com/bearpaw/pytorch-pose/issues/33
 
 def main(args):
     global best_acc
@@ -50,9 +49,9 @@ def main(args):
 
     # idx is the index of joints used to compute accuracy
     if args.dataset in ['mpii', 'lsp']:
-        idx = [1,2,3,4,5,6,11,12,15,16]
+        idx = [1, 2, 3, 4, 5, 6, 11, 12, 15, 16]
     elif args.dataset == 'coco':
-        idx = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
+        idx = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
     else:
         print("Unknown dataset: {}".format(args.dataset))
         assert False
@@ -110,7 +109,7 @@ def main(args):
                           'Train Acc', 'Val Acc'])
 
     print('    Total params: %.2fM'
-          % (sum(p.numel() for p in model.parameters())/1000000.0))
+          % (sum(p.numel() for p in model.parameters()) / 1000000.0))
 
     # create data loader
     train_dataset = datasets.__dict__[args.dataset](is_train=True, **vars(args))
@@ -143,8 +142,8 @@ def main(args):
 
         # decay sigma
         if args.sigma_decay > 0:
-            train_loader.dataset.sigma *=  args.sigma_decay
-            val_loader.dataset.sigma *=  args.sigma_decay
+            train_loader.dataset.sigma *= args.sigma_decay
+            val_loader.dataset.sigma *= args.sigma_decay
 
         # train for one epoch
         train_loss, train_acc = train(train_loader, model, criterion, optimizer,
@@ -152,7 +151,7 @@ def main(args):
 
         # evaluate on validation set
         valid_loss, valid_acc, predictions = validate(val_loader, model, criterion,
-                                                  njoints, args.debug, args.flip)
+                                                      njoints, args.debug, args.flip)
 
         # append logger file
         logger.append([epoch + 1, lr, train_loss, valid_loss, train_acc, valid_acc])
@@ -165,7 +164,7 @@ def main(args):
             'arch': args.arch,
             'state_dict': model.state_dict(),
             'best_acc': best_acc,
-            'optimizer' : optimizer.state_dict(),
+            'optimizer': optimizer.state_dict(),
         }, predictions, is_best, checkpoint=args.checkpoint, snapshot=args.snapshot)
 
     logger.close()
@@ -204,7 +203,7 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
             loss = criterion(output, target, target_weight)
         acc = accuracy(output, target, idx)
 
-        if debug: # visualize groundtruth and predictions
+        if debug:  # visualize groundtruth and predictions
             gt_batch_img = batch_with_heatmap(input, target)
             pred_batch_img = batch_with_heatmap(input, output)
             if not gt_win or not pred_win:
@@ -234,16 +233,16 @@ def train(train_loader, model, criterion, optimizer, debug=False, flip=True):
         end = time.time()
 
         # plot progress
-        bar.suffix  = '({batch}/{size}) Data: {data:.6f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
-                    batch=i + 1,
-                    size=len(train_loader),
-                    data=data_time.val,
-                    bt=batch_time.val,
-                    total=bar.elapsed_td,
-                    eta=bar.eta_td,
-                    loss=losses.avg,
-                    acc=acces.avg
-                    )
+        bar.suffix = '({batch}/{size}) Data: {data:.6f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
+            batch=i + 1,
+            size=len(train_loader),
+            data=data_time.val,
+            bt=batch_time.val,
+            total=bar.elapsed_td,
+            eta=bar.eta_td,
+            loss=losses.avg,
+            acc=acces.avg
+        )
         bar.next()
 
     bar.finish()
@@ -284,8 +283,6 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
                 flip_output = flip_back(flip_output)
                 score_map += flip_output
 
-
-
             if type(output) == list:  # multiple output
                 loss = 0
                 for o in output:
@@ -300,7 +297,6 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
             preds = final_preds(score_map, meta['center'], meta['scale'], [64, 64])
             for n in range(score_map.size(0)):
                 predictions[meta['index'][n], :, :] = preds[n, :, :]
-
 
             if debug:
                 gt_batch_img = batch_with_heatmap(input, target)
@@ -325,20 +321,21 @@ def validate(val_loader, model, criterion, num_classes, debug=False, flip=True):
             end = time.time()
 
             # plot progress
-            bar.suffix  = '({batch}/{size}) Data: {data:.6f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
-                        batch=i + 1,
-                        size=len(val_loader),
-                        data=data_time.val,
-                        bt=batch_time.avg,
-                        total=bar.elapsed_td,
-                        eta=bar.eta_td,
-                        loss=losses.avg,
-                        acc=acces.avg
-                        )
+            bar.suffix = '({batch}/{size}) Data: {data:.6f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | Acc: {acc: .4f}'.format(
+                batch=i + 1,
+                size=len(val_loader),
+                data=data_time.val,
+                bt=batch_time.avg,
+                total=bar.elapsed_td,
+                eta=bar.eta_td,
+                loss=losses.avg,
+                acc=acces.avg
+            )
             bar.next()
 
         bar.finish()
     return losses.avg, acces.avg, predictions
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
@@ -346,8 +343,8 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', metavar='DATASET', default='mpii',
                         choices=dataset_names,
                         help='Datasets: ' +
-                            ' | '.join(dataset_names) +
-                            ' (default: mpii)')
+                             ' | '.join(dataset_names) +
+                             ' (default: mpii)')
     parser.add_argument('--image-path', default='', type=str,
                         help='path to images')
     parser.add_argument('--anno-path', default='', type=str,
@@ -357,14 +354,14 @@ if __name__ == '__main__':
     parser.add_argument('--inp-res', default=256, type=int,
                         help='input resolution (default: 256)')
     parser.add_argument('--out-res', default=64, type=int,
-                    help='output resolution (default: 64, to gen GT)')
+                        help='output resolution (default: 64, to gen GT)')
 
     # Model structure
     parser.add_argument('--arch', '-a', metavar='ARCH', default='hg',
                         choices=model_names,
                         help='model architecture: ' +
-                            ' | '.join(model_names) +
-                            ' (default: hg)')
+                             ' | '.join(model_names) +
+                             ' (default: hg)')
     parser.add_argument('-s', '--stacks', default=8, type=int, metavar='N',
                         help='Number of hourglasses to stack')
     parser.add_argument('--features', default=256, type=int, metavar='N',
@@ -426,6 +423,5 @@ if __name__ == '__main__':
                         help='evaluate model on validation set')
     parser.add_argument('-d', '--debug', dest='debug', action='store_true',
                         help='show intermediate results')
-
 
     main(parser.parse_args())

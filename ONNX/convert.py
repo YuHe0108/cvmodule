@@ -7,7 +7,7 @@ sys.path.insert(0, './Classifier/torch')
 """将模型转换为 onnx"""
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-model = torch.load(r"C:\Users\yuhe\Desktop\model_weights\left_1_8_1.pt", map_location='cpu')  # pytorch模型加载
+model = torch.load(r"D:\Vortex\SVN\遗留物\left_classify\v1.17-2023-02-17.pt", map_location='cpu')  # pytorch模型加载
 batch_size = 1  # 批处理大小
 input_shape = (3, 224, 224)  # 输入数据,改成自己的输入shape
 
@@ -16,7 +16,7 @@ model.eval()
 
 x = torch.randn(batch_size, *input_shape)  # 生成张量
 # x = x.to(device)
-export_onnx_file = "efficient_left_1_8_1.onnx"  # 目的ONNX文件名
+export_onnx_file = r"D:\Vortex\SVN\遗留物\left_classify\xj3\1.17\v1.17.onnx"  # 目的ONNX文件名
 torch.onnx.export(model,
                   x,
                   export_onnx_file,
